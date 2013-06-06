@@ -13,7 +13,7 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 
 		// Sentry will look for uncaught exceptions from previous runs and send them		
-		Sentry.init(this, "https://5fdb6343bf324770b6085f1b17ef030f:b9b52af111f5420f9adf262bd6f88267@app.getsentry.com/7857");
+		Sentry.init(this, "YOUR-SENTRY-DSN");
 
 	}
 
@@ -23,6 +23,7 @@ public class MainActivity extends Activity {
 
 ## How To Get Started
 - Download the [Sentry-Android JAR]()
+- Download the [Protocol JAR](https://github.com/joshdholtz/Protocol-Android/raw/master/builds/protocol-1.0.4.jar)
 - Place the JAR in the Android project's "libs" directory
 - Code
 
