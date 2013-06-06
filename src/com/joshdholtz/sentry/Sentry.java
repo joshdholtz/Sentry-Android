@@ -11,10 +11,12 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import org.apache.http.HttpResponse;
@@ -33,7 +35,7 @@ import android.util.Log;
 
 public class Sentry {
 	
-	private final static String VERSION = "0.1.1";
+	private final static String VERSION = "0.1.2";
 
 	private String dsn;
 	private String packageName;
@@ -264,6 +266,9 @@ public class Sentry {
 	public static class SentryEventBuilder {
 		
 		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+		static {
+			sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+		}
 		
 		private Map<String, Object> event;
 		
