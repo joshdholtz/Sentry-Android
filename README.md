@@ -54,3 +54,7 @@ Sentry.captureEvent(new Sentry.SentryEventBuilder()
 );
 
 ````
+
+# Contact
+Email: [josh@rokkincat.com](mailto:josh@rokkincat.com)<br/>
+Twitter: [@joshdholtz](http://twitter.com/joshdholtz)
