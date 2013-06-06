@@ -32,6 +32,8 @@ import android.net.Uri;
 import android.util.Log;
 
 public class Sentry {
+	
+	private final static String VERSION = "0.1.1";
 
 	private String dsn;
 	private String packageName;
@@ -86,7 +88,7 @@ public class Sentry {
 		String secretKey = authorityParts[1];
 		
 		header += "Sentry sentry_version=4,";
-		header += "sentry_client=sentry-android/0.1,";
+		header += "sentry_client=sentry-android/" + VERSION + ",";
 		header += "sentry_timestamp=" + System.currentTimeMillis() +",";
 		header += "sentry_key=" + publicKey + ",";
 		header += "sentry_secret=" + secretKey;
@@ -103,19 +105,27 @@ public class Sentry {
 	}
 	
 	public static void captureMessage(String message) {
+		Sentry.captureMessage(message, SentryEventLevel.INFO);
+	}
+	
+	public static void captureMessage(String message, SentryEventLevel level) {
 		Sentry.captureEvent(new SentryEventBuilder()
-		.setMessage(message)
-		.setLevel(SentryEventLevel.INFO)
-	);
+			.setMessage(message)
+			.setLevel(level)
+		);
 	}
 	
 	public static void captureException(Throwable t) {
+		Sentry.captureException(t, SentryEventLevel.ERROR);
+	}
+	
+	public static void captureException(Throwable t, SentryEventLevel level) {
 		String culprit = getCause(t, t.getMessage());
 		
 		Sentry.captureEvent(new SentryEventBuilder()
 			.setMessage(t.getMessage())
 			.setCulprit(culprit)
-			.setLevel(SentryEventLevel.ERROR)
+			.setLevel(level)
 			.setException(t)
 		);
 		
@@ -143,7 +153,7 @@ public class Sentry {
 	public static void captureEvent(SentryEventBuilder builder) {
 		JSONRequestData requestData = new JSONRequestData(builder.event);
 		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
-		requestData.addHeader("User-Agent", "sentry-android/0.1");
+		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
 		
 		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
 		
@@ -228,7 +238,7 @@ public class Sentry {
 					Throwable t = (Throwable) ois.readObject();
 					ois.close();
 					
-					captureException(t);
+					captureException(t, SentryEventLevel.FATAL);
 					
 					Log.d(TAG, t.getMessage());
 					
