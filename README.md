@@ -23,7 +23,6 @@ public class MainActivity extends Activity {
 
 ## How To Get Started
 - Download the [Sentry-Android JAR]()
-- Download the [Protocol JAR](https://github.com/joshdholtz/Protocol-Android/raw/master/builds/protocol-1.0.4.jar)
-- Place the JAR in the Android project's "libs" directory
+- Download the [Protocol JAR](https://github.com/joshdholtz/Protocol-Android/raw/master/builds/protocol-1.0.4.jar) (Required dependency) - [View more info](https://github.com/joshdholtz/Protocol-Android)
+- Place both the JARs in the Android project's "libs" directory
 - Code
-
