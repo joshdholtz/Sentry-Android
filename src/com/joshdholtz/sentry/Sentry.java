@@ -286,6 +286,7 @@ public class Sentry {
 			event = new HashMap<String, Object>();
 			event.put("event_id", UUID.randomUUID().toString().replace("-", ""));
 			this.setPlatform("android");
+			this.setTimestamp(System.currentTimeMillis());
 		}
 		
 		/**
@@ -303,7 +304,7 @@ public class Sentry {
 		 * @param timestamp
 		 * @return
 		 */
-		public SentryEventBuilder setTimesstamp(long timestamp) {
+		public SentryEventBuilder setTimestamp(long timestamp) {
 			event.put("timestamp", sdf.format(new Date(timestamp)));
 			return this;
 		}
