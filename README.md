@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
 ````
 
 ## How To Get Started
-- Download the [Sentry-Android JAR](https://github.com/joshdholtz/Sentry-Android/raw/master/builds/sentry-0.1.0.jar)
+- Download the [Sentry-Android JAR](https://github.com/joshdholtz/Sentry-Android/raw/master/builds/sentry-0.1.1.jar)
 - Download the [Protocol JAR](https://github.com/joshdholtz/Protocol-Android/raw/master/builds/protocol-1.0.4.jar) (Required dependency) - [View more info](https://github.com/joshdholtz/Protocol-Android)
 - Place both the JARs in the Android project's "libs" directory
 - Code
@@ -50,7 +50,7 @@ try {
 Sentry.captureEvent(new Sentry.SentryEventBuilder()
 	.setMessage("Being awesome")
 	.setCulprit("Josh Holtz")
-	.setTimesstamp(System.currentTimeMillis())
+	.setTimestamp(System.currentTimeMillis())
 );
 
 ````
