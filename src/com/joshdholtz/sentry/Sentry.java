@@ -247,8 +247,6 @@ public class Sentry {
 					ois.close();
 
 					captureException(t, SentryEventLevel.FATAL);
-					
-					Log.d(TAG, t.getMessage());
 				}
 			}
 		} catch (Exception e) {
