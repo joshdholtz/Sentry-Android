@@ -75,7 +75,7 @@ public class Sentry {
 		if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
 			// Register default exceptions handler
 			Thread.setDefaultUncaughtExceptionHandler(
-					new SentryUncaughtExceptionHandler(currentHandler, context.getFilesDir().getAbsolutePath()));
+					new SentryUncaughtExceptionHandler(currentHandler, context));
 		}
 	}
 	
@@ -133,7 +133,35 @@ public class Sentry {
 		
 		
 	}
-	
+
+	public static void captureUncaughtException(Context context, Throwable t) {
+		final Writer result = new StringWriter();
+		final PrintWriter printWriter = new PrintWriter(result);
+		t.printStackTrace(printWriter);
+		try {
+			final String filePath = context.getFilesDir().getAbsolutePath();
+
+			// Random number to avoid duplicate files
+			long random = System.currentTimeMillis();
+
+			// Embed version in stacktrace filename
+			String filename = "Raven-" +  String.valueOf(random);
+			Log.d(TAG, "Writing unhandled exception to: " + filePath + "/" + filename + ".stacktrace");
+
+			// Write the stacktrace to disk
+			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(filePath + "/" + filename + ".stacktrace"));
+			oos.writeObject(t);
+			oos.flush();
+			// Close up everything
+			oos.close();
+		} catch (Exception ebos) {
+			// Nothing much we can do about this - the game is over
+			ebos.printStackTrace();
+		}
+
+		Log.d(TAG, result.toString());
+	}
+
 	private static String getCause(Throwable t, String culprit) {
 		for (StackTraceElement stackTrace : t.getStackTrace()) {
 			if (stackTrace.toString().contains(Sentry.getInstance().packageName)) {
@@ -173,40 +201,19 @@ public class Sentry {
 	private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
 		private UncaughtExceptionHandler defaultExceptionHandler;
-		private String filePath;
+		private Context context;
 
 		// constructor
-		public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, String filePath) {
+		public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, Context context) {
 			defaultExceptionHandler = pDefaultExceptionHandler;
-			this.filePath = filePath;
+			this.context = context;
 		}
 
 		@Override
 		public void uncaughtException(Thread thread, Throwable e) {
 			// Here you should have a more robust, permanent record of problems
-			final Writer result = new StringWriter();
-			final PrintWriter printWriter = new PrintWriter(result);
-			e.printStackTrace(printWriter);
-			try {
-				// Random number to avoid duplicate files
-				long random = System.currentTimeMillis();
+			Sentry.captureUncaughtException(context, e);
 
-				// Embed version in stacktrace filename
-				String filename = "Raven-" +  String.valueOf(random);
-				Log.d(TAG, "Writing unhandled exception to: " + filePath+"/"+filename+".stacktrace");
-
-				// Write the stacktrace to disk
-				ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(filePath + "/" + filename + ".stacktrace"));
-				oos.writeObject(e);
-				oos.flush();
-				// Close up everything
-				oos.close();
-			} catch (Exception ebos) {
-				// Nothing much we can do about this - the game is over
-				ebos.printStackTrace();
-			}
-
-			Log.d(TAG, result.toString());      
 			//call original handler  
 			defaultExceptionHandler.uncaughtException(thread, e);  
 		}
@@ -230,24 +237,21 @@ public class Sentry {
 		try {
 			Log.d(TAG, "Looking for exceptions in thing");
 			String[] list = searchForStackTraces(context);
-			if ( list != null && list.length > 0 ) {
-				
+			if (list != null && list.length > 0) {
 				Log.d(TAG, "Found "+list.length+" stacktrace(s)");
 				for (int i=0; i < list.length; i++) {
 					String filePath = context.getFilesDir().getAbsolutePath()+"/"+list[i];
-					
+
 					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filePath));
 					Throwable t = (Throwable) ois.readObject();
 					ois.close();
-					
+
 					captureException(t, SentryEventLevel.FATAL);
 					
 					Log.d(TAG, t.getMessage());
-					
 				}
-				
 			}
-		} catch( Exception e ) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
 			try {
