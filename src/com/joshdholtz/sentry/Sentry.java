@@ -63,8 +63,7 @@ public class Sentry {
 		Sentry.getInstance().packageName = context.getPackageName();
 		
 		Sentry.getInstance().client = new ProtocolClient(BASE_URL);
-		Sentry.getInstance().client.setDebug(true);
-		
+
 		submitStackTraces(context);
 
 		UncaughtExceptionHandler currentHandler = Thread.getDefaultUncaughtExceptionHandler();
