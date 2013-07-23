@@ -39,6 +39,7 @@ public class Sentry {
 
 	private String dsn;
 	private String packageName;
+	private SentryEventCaptureListener captureListener;
 	
 	private ProtocolClient client;
 
@@ -106,6 +107,13 @@ public class Sentry {
 		return projectId;
 	}
 	
+	/**
+	 * @param captureListener the captureListener to set
+	 */
+	public static void setCaptureListener(SentryEventCaptureListener captureListener) {
+		Sentry.getInstance().captureListener = captureListener;
+	}
+
 	public static void captureMessage(String message) {
 		Sentry.captureMessage(message, SentryEventLevel.INFO);
 	}
@@ -153,6 +161,10 @@ public class Sentry {
 	}
 	
 	public static void captureEvent(SentryEventBuilder builder) {
+		if (Sentry.getInstance().captureListener != null) {
+			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+		}
+		
 		JSONRequestData requestData = new JSONRequestData(builder.event);
 		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
 		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
@@ -263,6 +275,12 @@ public class Sentry {
 
 	}
 	
+	public abstract static class SentryEventCaptureListener {
+		
+		public abstract SentryEventBuilder beforeCapture(SentryEventBuilder builder);
+		
+	}
+	
 	public static class SentryEventBuilder {
 		
 		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -360,8 +378,21 @@ public class Sentry {
 		 * @return
 		 */
 		public SentryEventBuilder setTags(Map<String,String> tags) {
+			setTags(new JSONObject(tags));
+			return this;
+		}
+		
+		public SentryEventBuilder setTags(JSONObject tags) {
 			event.put("tags", tags);
 			return this;
+		}
+		
+		public JSONObject getTags() {
+			if (!event.containsKey("tags")) {
+				setTags(new HashMap<String, String>());
+			}
+			
+			return (JSONObject) event.get("tags");
 		}
 		
 		/**
@@ -390,8 +421,21 @@ public class Sentry {
 		 * @return
 		 */
 		public SentryEventBuilder setExtra(Map<String,String> extra) {
+			setExtra(new JSONObject(extra));
+			return this;
+		}
+		
+		public SentryEventBuilder setExtra(JSONObject extra) {
 			event.put("extra", extra);
 			return this;
+		}
+		
+		public JSONObject getExtra() {
+			if (!event.containsKey("extra")) {
+				setExtra(new HashMap<String, String>());
+			}
+			
+			return (JSONObject) event.get("extra");
 		}
 		
 		/**
