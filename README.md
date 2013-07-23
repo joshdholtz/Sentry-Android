@@ -79,3 +79,12 @@ Sentry.setCaptureListener(new SentryEventCaptureListener() {
 });
 
 ````
+
+## Contact
+
+Email: [josh@rokkincat.com](mailto:josh@rokkincat.com)<br/>
+Twitter: [@joshdholtz](http://twitter.com/joshdholtz)
+
+## License
+
+Sentry-Android is available under the MIT license. See the LICENSE file for more info.
