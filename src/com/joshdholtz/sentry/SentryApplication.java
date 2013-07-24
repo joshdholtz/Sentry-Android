@@ -15,9 +15,6 @@ public class SentryApplication extends Application {
 	public void onCreate() {
 		super.onCreate();
 		
-		// Sentry will look for uncaught exceptions from previous runs and send them        
-		Sentry.init(this, "YOUR-DSN");
-
 		// Sets a listener to intercept the SentryEventBuilder before 
 		// each capture to set values that could change state
 		Sentry.setCaptureListener(new SentryEventCaptureListener() {
@@ -38,6 +35,9 @@ public class SentryApplication extends Application {
 			}
 
 		});
+		
+		// Sentry will look for uncaught exceptions from previous runs and send them        
+		Sentry.init(this, "YOUR-DSN");
 
 		// Capture event
 		Sentry.captureEvent(new Sentry.SentryEventBuilder()

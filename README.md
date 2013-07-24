@@ -57,6 +57,7 @@ Sentry.captureEvent(new Sentry.SentryEventBuilder()
 
 ### Set a listener to intercept the SentryEventBuilder before each capture
 ```` java
+// CALL THIS BEFORE CALLING Sentry.init
 // Sets a listener to intercept the SentryEventBuilder before 
 // each capture to set values that could change state
 Sentry.setCaptureListener(new SentryEventCaptureListener() {
