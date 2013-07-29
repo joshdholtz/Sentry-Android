@@ -138,17 +138,15 @@ public class Sentry {
 		final PrintWriter printWriter = new PrintWriter(result);
 		t.printStackTrace(printWriter);
 		try {
-			final String filePath = context.getFilesDir().getAbsolutePath();
-
 			// Random number to avoid duplicate files
 			long random = System.currentTimeMillis();
 
 			// Embed version in stacktrace filename
-			String filename = "Raven-" +  String.valueOf(random);
-			Log.d(TAG, "Writing unhandled exception to: " + filePath + "/" + filename + ".stacktrace");
+			File stacktrace = new File(getStacktraceLocation(context), "raven-" +  String.valueOf(random) + ".stacktrace");
+			Log.d(TAG, "Writing unhandled exception to: " + stacktrace.getAbsolutePath());
 
 			// Write the stacktrace to disk
-			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(filePath + "/" + filename + ".stacktrace"));
+			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(stacktrace));
 			oos.writeObject(t);
 			oos.flush();
 			// Close up everything
@@ -171,6 +169,10 @@ public class Sentry {
 		
 		return culprit;
 	}
+
+	private static File getStacktraceLocation(Context context) {
+		return new File(context.getCacheDir(), "crashes");
+	}
 	
 	private static String getStackTrace(Throwable t) {
 		StringWriter sw = new StringWriter();
@@ -183,9 +185,9 @@ public class Sentry {
 		JSONRequestData requestData = new JSONRequestData(builder.event);
 		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
 		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
-		
+
 		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
-		
+
 		Sentry.getInstance().client.doPost("/api/" + getProjectId() + "/store/", requestData, new ProtocolResponseHandler() {
 
 		    @Override
@@ -220,9 +222,9 @@ public class Sentry {
 	}
 
 	private static String[] searchForStackTraces(Context context) {
-		File dir = new File(context.getFilesDir().getAbsolutePath() + "/");
+		File dir = getStacktraceLocation(context);
 		// Try to create the files folder if it doesn't exist
-		dir.mkdir();
+		dir.mkdirs();
 		// Filter for ".stacktrace" files
 		FilenameFilter filter = new FilenameFilter() { 
 			public boolean accept(File dir, String name) {
@@ -234,14 +236,14 @@ public class Sentry {
 
 	private static void submitStackTraces(final Context context) {
 		try {
-			Log.d(TAG, "Looking for exceptions in thing");
+			Log.d(TAG, "Looking for exceptions to submit");
 			String[] list = searchForStackTraces(context);
 			if (list != null && list.length > 0) {
 				Log.d(TAG, "Found "+list.length+" stacktrace(s)");
 				for (int i=0; i < list.length; i++) {
-					String filePath = context.getFilesDir().getAbsolutePath()+"/"+list[i];
+					File stacktrace = new File(getStacktraceLocation(context), list[i]);
 
-					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filePath));
+					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(stacktrace));
 					Throwable t = (Throwable) ois.readObject();
 					ois.close();
 
@@ -254,7 +256,7 @@ public class Sentry {
 			try {
 				String[] list = searchForStackTraces(context);
 				for ( int i = 0; i < list.length; i ++ ) {
-					File file = new File(context.getFilesDir().getAbsolutePath()+"/"+list[i]);
+					File file = new File(getStacktraceLocation(context), list[i]);
 					file.delete();
 				}
 			} catch (Exception e) {
