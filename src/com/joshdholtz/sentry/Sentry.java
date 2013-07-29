@@ -363,7 +363,7 @@ public class Sentry {
 		 * @return
 		 */
 		public SentryEventBuilder setTags(Map<String,String> tags) {
-			event.put("tags", tags);
+			event.put("tags", new JSONObject(tags));
 			return this;
 		}
 		
@@ -383,7 +383,7 @@ public class Sentry {
 		 * @return
 		 */
 		public SentryEventBuilder setModules(List<String> modules) {
-			event.put("modules", modules);
+			event.put("modules", new JSONArray(modules));
 			return this;
 		}
 		
@@ -393,7 +393,7 @@ public class Sentry {
 		 * @return
 		 */
 		public SentryEventBuilder setExtra(Map<String,String> extra) {
-			event.put("extra", extra);
+			event.put("extra", new JSONObject(extra));
 			return this;
 		}
 
