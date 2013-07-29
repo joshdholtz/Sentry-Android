@@ -394,10 +394,10 @@ public class Sentry {
 			event.put("extra", extra);
 			return this;
 		}
-		
+
 		/**
-		 * 
-		 * @param extra
+		 *
+		 * @param t
 		 * @return
 		 */
 		public SentryEventBuilder setException(Throwable t) {
