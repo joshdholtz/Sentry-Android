@@ -39,6 +39,7 @@ public class Sentry {
 
 	private String dsn;
 	private String packageName;
+	private Map<String, String> tags;
 	
 	private ProtocolClient client;
 
@@ -59,10 +60,16 @@ public class Sentry {
 	}
 
 	public static void init(Context context, String dsn) {
-		Sentry.getInstance().dsn = dsn;
-		Sentry.getInstance().packageName = context.getPackageName();
-		
-		Sentry.getInstance().client = new ProtocolClient(BASE_URL);
+		init(context, dsn, new HashMap<String, String>());
+	}
+
+	public static void init(Context context, String dsn, Map<String, String> tags) {
+		Sentry instance = Sentry.getInstance();
+		instance.dsn = dsn;
+		instance.packageName = context.getPackageName();
+		instance.tags = tags;
+
+		instance.client = new ProtocolClient(BASE_URL);
 
 		submitStackTraces(context);
 
@@ -111,8 +118,9 @@ public class Sentry {
 	
 	public static void captureMessage(String message, SentryEventLevel level) {
 		Sentry.captureEvent(new SentryEventBuilder()
-			.setMessage(message)
-			.setLevel(level)
+				.setMessage(message)
+				.setLevel(level)
+				.setTags(getInstance().tags)
 		);
 	}
 	
@@ -128,6 +136,7 @@ public class Sentry {
 			.setCulprit(culprit)
 			.setLevel(level)
 			.setException(t)
+			.setTags(getInstance().tags)
 		);
 		
 		
