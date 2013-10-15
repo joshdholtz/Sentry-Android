@@ -39,9 +39,10 @@ public class SentryApplication extends Application {
 		// Sentry will look for uncaught exceptions from previous runs and send them        
 		Sentry.init(this, "YOUR-DSN");
 
+		
 		// Capture event
 		Sentry.captureEvent(new Sentry.SentryEventBuilder()
-			.setMessage("Being so awesome at stuff")
+			.setMessage("Being so awesome at stuff 2")
 			.setCulprit("Josh D Holtz")
 			.setTimestamp(System.currentTimeMillis())
 		);

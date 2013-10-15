@@ -37,6 +37,7 @@ public class Sentry {
 	
 	private final static String VERSION = "0.1.2";
 
+	private String baseUrl;
 	private String dsn;
 	private String packageName;
 	private SentryEventCaptureListener captureListener;
@@ -44,7 +45,7 @@ public class Sentry {
 	private ProtocolClient client;
 
 	private static final String TAG = "Sentry";
-	private static final String BASE_URL = "https://app.getsentry.com";
+	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
 	
 	private Sentry() {
 
@@ -60,10 +61,15 @@ public class Sentry {
 	}
 
 	public static void init(Context context, String dsn) {
+		Sentry.init(context, DEFAULT_BASE_URL, dsn);
+	}
+	
+	public static void init(Context context, String baseUrl, String dsn) {
+		Sentry.getInstance().baseUrl = baseUrl;
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 		
-		Sentry.getInstance().client = new ProtocolClient(BASE_URL);
+		Sentry.getInstance().client = new ProtocolClient(baseUrl);
 		Sentry.getInstance().client.setDebug(true);
 		
 		submitStackTraces(context);
@@ -84,6 +90,7 @@ public class Sentry {
 		String header = "";
 		
 		Uri uri = Uri.parse(Sentry.getInstance().dsn);
+		Log.d("Sentry", "URI - " + uri);
 		String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
 		
 		String[] authorityParts = authority.split(":");
@@ -168,6 +175,7 @@ public class Sentry {
 		JSONRequestData requestData = new JSONRequestData(builder.event);
 		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
 		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
+		requestData.addHeader("Content-Type", "text/html; charset=utf-8");
 		
 		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
 		
