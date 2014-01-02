@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
 ````
 
 ## How To Get Started
-- Download the [Sentry-Android JAR](https://github.com/joshdholtz/Sentry-Android/raw/master/builds/sentry-0.1.3.jar)
+- Download the [Sentry-Android JAR](https://github.com/joshdholtz/Sentry-Android/raw/master/builds/sentry-0.1.4.jar)
 - Download the [Protocol JAR](https://github.com/joshdholtz/Protocol-Android/raw/master/builds/protocol-1.0.4.jar) (Required dependency) - [View more info](https://github.com/joshdholtz/Protocol-Android)
 - Place both the JARs in the Android project's "libs" directory
 - Code
@@ -72,12 +72,21 @@ Sentry.setCaptureListener(new SentryEventCaptureListener() {
 		// Sets extra key if wifi is connected
 		try {
 			builder.getExtra().put("wifi", String.valueOf(mWifi.isConnected()));
+			builder.getTags().put("tag_1", "value_1");
 		} catch (JSONException e) {}
 		
 		return builder;
 	}
 	
 });
+
+````
+
+## Use for self hosted Sentry
+
+### Init with your base url
+```` java
+Sentry.init(this, "http://your-base-url.com" "YOUR-SENTRY-DSN");
 
 ````
 
