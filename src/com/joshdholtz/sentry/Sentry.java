@@ -16,7 +16,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -39,6 +38,8 @@ public class Sentry {
 	
 	private final static String VERSION = "0.1.2";
 
+	private Context context;
+	
 	private String baseUrl;
 	private String dsn;
 	private String packageName;
@@ -67,6 +68,8 @@ public class Sentry {
 	}
 	
 	public static void init(Context context, String baseUrl, String dsn) {
+			Sentry.getInstance().context = context;
+		
 	        Sentry.getInstance().baseUrl = baseUrl;
 	        Sentry.getInstance().dsn = dsn;
 	        Sentry.getInstance().packageName = context.getPackageName();
@@ -155,6 +158,23 @@ public class Sentry {
 		final Writer result = new StringWriter();
 		final PrintWriter printWriter = new PrintWriter(result);
 		t.printStackTrace(printWriter);
+		
+		String culprit = getCause(t, t.getMessage());
+		SentryEventBuilder eventBuilder = new SentryEventBuilder()
+			.setMessage(t.getMessage())
+			.setCulprit(culprit)
+			.setLevel(SentryEventLevel.ERROR)
+			.setException(t);
+		saveToSendLater(context, eventBuilder);
+	}
+	
+	private static void saveToSendLater(Context context, SentryEventBuilder eventBuilder) {
+		// Save JSON string
+		String string = new JSONObject(eventBuilder.event).toString();
+		saveToSendLater(context, string);
+	}
+	
+	private static void saveToSendLater(Context context, String string) {
 		try {
 			// Random number to avoid duplicate files
 			long random = System.currentTimeMillis();
@@ -162,10 +182,10 @@ public class Sentry {
 			// Embed version in stacktrace filename
 			File stacktrace = new File(getStacktraceLocation(context), "raven-" +  String.valueOf(random) + ".stacktrace");
 			Log.d(TAG, "Writing unhandled exception to: " + stacktrace.getAbsolutePath());
-
+			
 			// Write the stacktrace to disk
 			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(stacktrace));
-			oos.writeObject(t);
+			oos.writeObject(string);
 			oos.flush();
 			// Close up everything
 			oos.close();
@@ -173,8 +193,6 @@ public class Sentry {
 			// Nothing much we can do about this - the game is over
 			ebos.printStackTrace();
 		}
-
-		Log.d(TAG, result.toString());
 	}
 
 	private static String getCause(Throwable t, String culprit) {
@@ -204,23 +222,35 @@ public class Sentry {
 			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
 		}
 		
-		JSONRequestData requestData = new JSONRequestData(builder.event);
-		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
-		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
-		requestData.addHeader("Content-Type", "text/html; charset=utf-8");
-		
+		sendCapture(new JSONObject(builder.event).toString(), false);
+	}
+	
+	private static void sendCapture(final String string, final boolean alreadySaved) {
+		try {
+			JSONRequestData requestData = new JSONRequestData(new JSONObject(string));
+			
+			requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
+			requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
+			requestData.addHeader("Content-Type", "text/html; charset=utf-8");
+			
+			Log.d(TAG, "Request - " + string);
 
-		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
+			Sentry.getInstance().client.doPost("/api/" + getProjectId() + "/store/", requestData, new ProtocolResponseHandler() {
 
-		Sentry.getInstance().client.doPost("/api/" + getProjectId() + "/store/", requestData, new ProtocolResponseHandler() {
+			    @Override
+			    public void handleResponse(HttpResponse response, int status, byte[] data) {
+			        String responseData = new String(data);
+			        Log.d(TAG, "SendEvent - " + status + " " + responseData);
+			        
+			        if (status != 200 && !alreadySaved) {
+			        	saveToSendLater(Sentry.getInstance().context, string);
+			        }
+	 		    }
 
-		    @Override
-		    public void handleResponse(HttpResponse response, int status, byte[] data) {
-		        String responseData = new String(data);
-		        Log.d(TAG, "SendEvent - " + status + " " + responseData);
-		    }
-
-		});
+			});
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
@@ -268,10 +298,10 @@ public class Sentry {
 					File stacktrace = new File(getStacktraceLocation(context), list[i]);
 
 					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(stacktrace));
-					Throwable t = (Throwable) ois.readObject();
+					String s = (String) ois.readObject();
 					ois.close();
 
-					captureException(t, SentryEventLevel.FATAL);
+					sendCapture(s, true);
 				}
 			}
 		} catch (Exception e) {
@@ -303,7 +333,7 @@ public class Sentry {
 			sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 		}
 		
-		private Map<String, Object> event;
+		private HashMap<String, Object> event;
 		
 		public static enum SentryEventLevel {
 			
