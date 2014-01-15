@@ -301,6 +301,7 @@ public class Sentry {
 					String s = (String) ois.readObject();
 					ois.close();
 
+					
 					sendCapture(s, true);
 				}
 			}
