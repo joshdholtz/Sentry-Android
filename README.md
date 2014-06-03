@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
 ````
 
 ## How To Get Started
-- Download the [Sentry-Android JAR - v1.0.0](https://github.com/joshdholtz/Sentry-Android/raw/master/builds/sentry-1.0.0.jar)
+- Download the [Sentry-Android JAR - v1.0.0](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.0.0)
 - Place the JAR in the Android project's "libs" directory
 - Code
 
