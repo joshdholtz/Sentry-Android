@@ -21,6 +21,13 @@ public class MainActivity extends Activity {
 		
 ````
 
+### Updates
+
+Version | Changes
+--- | ---
+**1.0.0** | Removed dependency to `Protocol`, allows capture of message from background thread
+**0.1.0** | Initial release
+
 ## How To Get Started
 - Download the [Sentry-Android JAR - v1.0.0](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.0.0)
 - Place the JAR in the Android project's "libs" directory
