@@ -13,7 +13,7 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 
 		// Sentry will look for uncaught exceptions from previous runs and send them		
-		Sentry.init(this, "YOUR-SENTRY-DSN");
+		Sentry.init(this.getApplicationContext(), "YOUR-SENTRY-DSN");
 
 	}
 
