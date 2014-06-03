@@ -33,12 +33,16 @@ import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 public class Sentry {
 	
 	private final static String VERSION = "0.1.2";
 
+	private Context context;
+	
 	private String baseUrl;
 	private String dsn;
 	private String packageName;
@@ -67,6 +71,8 @@ public class Sentry {
 	}
 	
 	public static void init(Context context, String baseUrl, String dsn) {
+			Sentry.getInstance().context = context;
+		
 	        Sentry.getInstance().baseUrl = baseUrl;
 	        Sentry.getInstance().dsn = dsn;
 	        Sentry.getInstance().packageName = context.getPackageName();
@@ -204,7 +210,7 @@ public class Sentry {
 			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
 		}
 		
-		JSONRequestData requestData = new JSONRequestData(builder.event);
+		final JSONRequestData requestData = new JSONRequestData(builder.event);
 		requestData.addHeader("X-Sentry-Auth", createXSentryAuthHeader());
 		requestData.addHeader("User-Agent", "sentry-android/" + VERSION);
 		requestData.addHeader("Content-Type", "text/html; charset=utf-8");
@@ -212,6 +218,27 @@ public class Sentry {
 
 		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
 
+		// Check if on main thread - if not, run on main thread
+		if (Looper.myLooper() == Looper.getMainLooper()) {
+			doCaptureEventPost(requestData);
+		} else if (Sentry.getInstance().context != null) {
+			Handler mainHandler = new Handler(Sentry.getInstance().context.getMainLooper());
+
+			Runnable runnable = new Runnable() {
+
+				@Override
+				public void run() {
+					doCaptureEventPost(requestData);
+				}
+				
+			};
+			mainHandler.post(runnable);
+		}
+		
+		
+	}
+	
+	private static void doCaptureEventPost(JSONRequestData requestData) {
 		Sentry.getInstance().client.doPost("/api/" + getProjectId() + "/store/", requestData, new ProtocolResponseHandler() {
 
 		    @Override
