@@ -262,7 +262,7 @@ public class Sentry {
 
 	}
 
-	private static boolean isNetworkAvailable() {
+	private static boolean shouldAttemptPost() {
 		PackageManager pm = Sentry.getInstance().context.getPackageManager();
 		int hasPerm = pm.checkPermission(android.Manifest.permission.ACCESS_NETWORK_STATE, Sentry.getInstance().context.getPackageName());
 		if (hasPerm == PackageManager.PERMISSION_DENIED) {
@@ -276,7 +276,7 @@ public class Sentry {
 	
 	private static void doCaptureEventPost(final SentryEventRequest request) {
 		
-		if (!isNetworkAvailable()) {
+		if (!shouldAttemptPost()) {
 			InternalStorage.getInstance().addRequest(request);
 			return;
 		}
