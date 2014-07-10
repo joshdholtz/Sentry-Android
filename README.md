@@ -25,11 +25,12 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
-**1.0.0** | Removed dependency to `Protocol`, allows capture of message from background thread
+**1.1.0** | Saves requests that were captured offline or failed and tries to resend them when it can
+**1.0.0** | Removed dependency to `Protocol`; allows capture of message from background thread
 **0.1.0** | Initial release
 
 ## How To Get Started
-- Download the [Sentry-Android JAR - v1.0.0](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.0.0)
+- Download the [Sentry-Android JAR - v1.1.0](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.1.0)
 - Place the JAR in the Android project's "libs" directory
 - Code
 
