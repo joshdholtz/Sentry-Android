@@ -36,6 +36,9 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -138,6 +141,7 @@ public class Sentry {
 
 	public static void sendAllCachedCapturedEvents() {
 		ArrayList<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
+		Log.d(Sentry.TAG, "Sending up " + unsentRequests.size() + " cached response(s)");
 		for (SentryEventRequest request : unsentRequests) {
 			Sentry.doCaptureEventPost(request);
 		}
@@ -260,10 +264,16 @@ public class Sentry {
 		new AsyncTask<Void, Void, Void>(){
 			@Override
 			protected Void doInBackground(Void... params) {
-
+				
 				HttpClient httpClient = new DefaultHttpClient();
 				HttpPost httpPost = new HttpPost(Sentry.getInstance().baseUrl + "/api/" + getProjectId() + "/store/");
 
+				int TIMEOUT_MILLISEC = 10000;  // = 20 seconds
+				HttpParams httpParams = httpPost.getParams();
+				HttpConnectionParams.setConnectionTimeout(httpParams, TIMEOUT_MILLISEC);
+				HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
+				
+				boolean success = false;
 				try {
 					httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader());
 					httpPost.setHeader("User-Agent", "sentry-android/" + VERSION);
@@ -297,17 +307,21 @@ public class Sentry {
 						e.printStackTrace();
 					}
 
-					if (status == 200) {
-						InternalStorage.getInstance().removeBuilder(request);
-					} else {
-						InternalStorage.getInstance().addRequest(request);
-					}
+					success = (status == 200);
 					
 					Log.d(TAG, "SendEvent - " + status + " " + stringResponse);
 				} catch (ClientProtocolException e) {
 					e.printStackTrace();
 				} catch (IOException e) {
 					e.printStackTrace();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				if (success) {
+					InternalStorage.getInstance().removeBuilder(request);
+				} else {
+					InternalStorage.getInstance().addRequest(request);
 				}
 
 				return null;
@@ -351,7 +365,6 @@ public class Sentry {
 			// Here you should have a more robust, permanent record of problems
 			SentryEventBuilder eventBuilder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
 			InternalStorage.getInstance().addRequest(new SentryEventRequest(eventBuilder));
-//			Sentry.captureUncaughtException(context, e);
 
 			//call original handler  
 			defaultExceptionHandler.uncaughtException(thread, e);  
@@ -385,6 +398,7 @@ public class Sentry {
 
 		public void addRequest(SentryEventRequest request) {
 			synchronized(this) {
+				Log.d(Sentry.TAG, "Adding request - " + request.uuid);
 				if (!this.unsentRequests.contains(request)) {
 					this.unsentRequests.add(request);
 					this.writeObject(Sentry.getInstance().context, this.unsentRequests);
@@ -394,6 +408,7 @@ public class Sentry {
 		
 		public void removeBuilder(SentryEventRequest request) {
 			synchronized(this) {
+				Log.d(Sentry.TAG, "Removing request - " + request.uuid);
 				this.unsentRequests.remove(request);
 				this.writeObject(Sentry.getInstance().context, this.unsentRequests);
 			}
