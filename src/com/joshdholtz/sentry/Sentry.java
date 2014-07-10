@@ -432,51 +432,6 @@ public class Sentry {
 		}
 	}
 
-//	private static String[] searchForStackTraces(Context context) {
-//		File dir = getStacktraceLocation(context);
-//		// Try to create the files folder if it doesn't exist
-//		dir.mkdirs();
-//		// Filter for ".stacktrace" files
-//		FilenameFilter filter = new FilenameFilter() { 
-//			public boolean accept(File dir, String name) {
-//				return name.endsWith(".stacktrace"); 
-//			} 
-//		}; 
-//		return dir.list(filter); 
-//	}
-//
-//	private static void submitStackTraces(final Context context) {
-//		try {
-//			Log.d(TAG, "Looking for exceptions to submit");
-//			String[] list = searchForStackTraces(context);
-//			if (list != null && list.length > 0) {
-//				Log.d(TAG, "Found "+list.length+" stacktrace(s)");
-//				for (int i=0; i < list.length; i++) {
-//					File stacktrace = new File(getStacktraceLocation(context), list[i]);
-//
-//					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(stacktrace));
-//					Throwable t = (Throwable) ois.readObject();
-//					ois.close();
-//
-//					captureException(t, SentryEventLevel.FATAL);
-//				}
-//			}
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		} finally {
-//			try {
-//				String[] list = searchForStackTraces(context);
-//				for ( int i = 0; i < list.length; i ++ ) {
-//					File file = new File(getStacktraceLocation(context), list[i]);
-//					file.delete();
-//				}
-//			} catch (Exception e) {
-//				e.printStackTrace();
-//			}
-//		}
-//
-//	}
-
 	public abstract static class SentryEventCaptureListener {
 
 		public abstract SentryEventBuilder beforeCapture(SentryEventBuilder builder);
