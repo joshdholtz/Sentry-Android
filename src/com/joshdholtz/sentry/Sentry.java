@@ -11,7 +11,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.ByteBuffer;
@@ -20,17 +19,13 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -41,9 +36,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-//import com.joshdholtz.protocol.lib.ProtocolClient;
-//import com.joshdholtz.protocol.lib.requests.JSONRequestData;
-//import com.joshdholtz.protocol.lib.responses.ProtocolResponseHandler;
 import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
 
 import android.content.Context;
@@ -64,8 +56,6 @@ public class Sentry {
 	private String dsn;
 	private String packageName;
 	private SentryEventCaptureListener captureListener;
-
-	private HttpClient client;
 
 	private static final String TAG = "Sentry";
 	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
