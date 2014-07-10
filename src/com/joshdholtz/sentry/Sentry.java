@@ -3,6 +3,7 @@ package com.joshdholtz.sentry;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -10,6 +11,8 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.io.Serializable;
+import java.io.StreamCorruptedException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -19,6 +22,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -68,7 +72,6 @@ public class Sentry {
 		return LazyHolder.instance;
 	}
 
-
 	private static class LazyHolder {
 		private static Sentry instance = new Sentry();
 	}
@@ -84,18 +87,25 @@ public class Sentry {
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 
-		submitStackTraces(context);
-
+		
+		Sentry.getInstance().setupUncaughtExceptionHandler();
+	}
+	
+	private void setupUncaughtExceptionHandler() {
+		
 		UncaughtExceptionHandler currentHandler = Thread.getDefaultUncaughtExceptionHandler();
 		if (currentHandler != null) {
 			Log.d("Debugged", "current handler class="+currentHandler.getClass().getName());
 		}
+		
 		// don't register again if already registered
 		if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
 			// Register default exceptions handler
 			Thread.setDefaultUncaughtExceptionHandler(
 					new SentryUncaughtExceptionHandler(currentHandler, context));
 		}
+		
+		sendAllCachedCapturedEvents();
 	}
 
 	private static String createXSentryAuthHeader() {
@@ -126,6 +136,13 @@ public class Sentry {
 		return projectId;
 	}
 
+	public static void sendAllCachedCapturedEvents() {
+		ArrayList<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
+		for (SentryEventRequest request : unsentRequests) {
+			Sentry.doCaptureEventPost(request);
+		}
+	}
+	
 	/**
 	 * @param captureListener the captureListener to set
 	 */
@@ -157,7 +174,6 @@ public class Sentry {
 		.setLevel(level)
 		.setException(t)
 				);
-
 
 	}
 
@@ -210,21 +226,18 @@ public class Sentry {
 	}
 
 	public static void captureEvent(SentryEventBuilder builder) {
+		final SentryEventRequest request;
 		if (Sentry.getInstance().captureListener != null) {
-			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+			request = new SentryEventRequest(Sentry.getInstance().captureListener.beforeCapture(builder));
+		} else {
+			request = new SentryEventRequest(builder);
 		}
 
-		/*
-		 * Creating request data
-		 */
-		final Map<String, Object> requestData = new HashMap<String, Object>();
-		requestData.putAll(builder.event);
-
-		Log.d(TAG, "Request - " + new JSONObject(builder.event).toString());
+		Log.d(TAG, "Request - " + request.getRequestData());
 
 		// Check if on main thread - if not, run on main thread
 		if (Looper.myLooper() == Looper.getMainLooper()) {
-			doCaptureEventPost(requestData);
+			doCaptureEventPost(request);
 		} else if (Sentry.getInstance().context != null) {
 
 			HandlerThread thread = new HandlerThread("SentryThread") {};
@@ -232,7 +245,7 @@ public class Sentry {
 			Runnable runnable = new Runnable() {
 				@Override
 				public void run() {
-					doCaptureEventPost(requestData);
+					doCaptureEventPost(request);
 				}
 			};
 			Handler h = new Handler(thread.getLooper());
@@ -242,8 +255,8 @@ public class Sentry {
 
 	}
 
-	private static void doCaptureEventPost(final Map<String, Object> requestData) {
-
+	private static void doCaptureEventPost(final SentryEventRequest request) {
+		
 		new AsyncTask<Void, Void, Void>(){
 			@Override
 			protected Void doInBackground(Void... params) {
@@ -256,7 +269,7 @@ public class Sentry {
 					httpPost.setHeader("User-Agent", "sentry-android/" + VERSION);
 					httpPost.setHeader("Content-Type", "text/html; charset=utf-8");
 
-					httpPost.setEntity(new StringEntity(new JSONObject(requestData).toString()));
+					httpPost.setEntity(new StringEntity(request.getRequestData()));
 					HttpResponse httpResponse = httpClient.execute(httpPost);
 
 					int status = httpResponse.getStatusLine().getStatusCode();
@@ -284,6 +297,12 @@ public class Sentry {
 						e.printStackTrace();
 					}
 
+					if (status == 200) {
+						InternalStorage.getInstance().removeBuilder(request);
+					} else {
+						InternalStorage.getInstance().addRequest(request);
+					}
+					
 					Log.d(TAG, "SendEvent - " + status + " " + stringResponse);
 				} catch (ClientProtocolException e) {
 					e.printStackTrace();
@@ -316,7 +335,7 @@ public class Sentry {
 
 	}
 
-	private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
+	private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
 		private UncaughtExceptionHandler defaultExceptionHandler;
 		private Context context;
@@ -330,67 +349,180 @@ public class Sentry {
 		@Override
 		public void uncaughtException(Thread thread, Throwable e) {
 			// Here you should have a more robust, permanent record of problems
-			Sentry.captureUncaughtException(context, e);
+			SentryEventBuilder eventBuilder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
+			InternalStorage.getInstance().addRequest(new SentryEventRequest(eventBuilder));
+//			Sentry.captureUncaughtException(context, e);
 
 			//call original handler  
 			defaultExceptionHandler.uncaughtException(thread, e);  
 		}
 
 	}
+	
+	private static class InternalStorage {
 
-	private static String[] searchForStackTraces(Context context) {
-		File dir = getStacktraceLocation(context);
-		// Try to create the files folder if it doesn't exist
-		dir.mkdirs();
-		// Filter for ".stacktrace" files
-		FilenameFilter filter = new FilenameFilter() { 
-			public boolean accept(File dir, String name) {
-				return name.endsWith(".stacktrace"); 
-			} 
-		}; 
-		return dir.list(filter); 
-	}
+		private final static String FILE_NAME = "unsent_requests";
+		private ArrayList<SentryEventRequest> unsentRequests;
+		
+		private static InternalStorage getInstance() {
+			return LazyHolder.instance;
+		}
 
-	private static void submitStackTraces(final Context context) {
-		try {
-			Log.d(TAG, "Looking for exceptions to submit");
-			String[] list = searchForStackTraces(context);
-			if (list != null && list.length > 0) {
-				Log.d(TAG, "Found "+list.length+" stacktrace(s)");
-				for (int i=0; i < list.length; i++) {
-					File stacktrace = new File(getStacktraceLocation(context), list[i]);
+		private static class LazyHolder {
+			private static InternalStorage instance = new InternalStorage();
+		}
+		
+		private InternalStorage() {
+			this.unsentRequests = this.readObject(Sentry.getInstance().context);
+		}		
+		
+		/**
+		 * @return the unsentRequests
+		 */
+		public ArrayList<SentryEventRequest> getUnsentRequests() {
+			return unsentRequests;
+		}
 
-					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(stacktrace));
-					Throwable t = (Throwable) ois.readObject();
-					ois.close();
-
-					captureException(t, SentryEventLevel.FATAL);
+		public void addRequest(SentryEventRequest request) {
+			synchronized(this) {
+				if (!this.unsentRequests.contains(request)) {
+					this.unsentRequests.add(request);
+					this.writeObject(Sentry.getInstance().context, this.unsentRequests);
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
+		}
+		
+		public void removeBuilder(SentryEventRequest request) {
+			synchronized(this) {
+				this.unsentRequests.remove(request);
+				this.writeObject(Sentry.getInstance().context, this.unsentRequests);
+			}
+		}
+
+		private void writeObject(Context context, ArrayList<SentryEventRequest> requests) {
 			try {
-				String[] list = searchForStackTraces(context);
-				for ( int i = 0; i < list.length; i ++ ) {
-					File file = new File(getStacktraceLocation(context), list[i]);
-					file.delete();
-				}
-			} catch (Exception e) {
+				FileOutputStream fos = context.openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(requests);
+				oos.close();
+				fos.close();
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 
+		private ArrayList<SentryEventRequest> readObject(Context context) {
+			try {
+				FileInputStream fis = context.openFileInput(FILE_NAME);
+				ObjectInputStream ois = new ObjectInputStream(fis);
+				ArrayList<SentryEventRequest> requests = (ArrayList<SentryEventRequest>) ois.readObject();
+				return requests;
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			} catch (StreamCorruptedException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+			return new ArrayList<SentryEventRequest>();
+		}
 	}
+
+//	private static String[] searchForStackTraces(Context context) {
+//		File dir = getStacktraceLocation(context);
+//		// Try to create the files folder if it doesn't exist
+//		dir.mkdirs();
+//		// Filter for ".stacktrace" files
+//		FilenameFilter filter = new FilenameFilter() { 
+//			public boolean accept(File dir, String name) {
+//				return name.endsWith(".stacktrace"); 
+//			} 
+//		}; 
+//		return dir.list(filter); 
+//	}
+//
+//	private static void submitStackTraces(final Context context) {
+//		try {
+//			Log.d(TAG, "Looking for exceptions to submit");
+//			String[] list = searchForStackTraces(context);
+//			if (list != null && list.length > 0) {
+//				Log.d(TAG, "Found "+list.length+" stacktrace(s)");
+//				for (int i=0; i < list.length; i++) {
+//					File stacktrace = new File(getStacktraceLocation(context), list[i]);
+//
+//					ObjectInputStream ois = new ObjectInputStream(new FileInputStream(stacktrace));
+//					Throwable t = (Throwable) ois.readObject();
+//					ois.close();
+//
+//					captureException(t, SentryEventLevel.FATAL);
+//				}
+//			}
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		} finally {
+//			try {
+//				String[] list = searchForStackTraces(context);
+//				for ( int i = 0; i < list.length; i ++ ) {
+//					File file = new File(getStacktraceLocation(context), list[i]);
+//					file.delete();
+//				}
+//			} catch (Exception e) {
+//				e.printStackTrace();
+//			}
+//		}
+//
+//	}
 
 	public abstract static class SentryEventCaptureListener {
 
 		public abstract SentryEventBuilder beforeCapture(SentryEventBuilder builder);
 
 	}
+	
+	public static class SentryEventRequest implements Serializable {
+		private String requestData;
+		private UUID uuid;
+		
+		public SentryEventRequest(SentryEventBuilder builder) {
+			this.requestData = new JSONObject(builder.event).toString();
+			this.uuid = UUID.randomUUID();
+		}
+		
+		/**
+		 * @return the requestData
+		 */
+		public String getRequestData() {
+			return requestData;
+		}
 
-	public static class SentryEventBuilder {
+		/**
+		 * @return the uuid
+		 */
+		public UUID getUuid() {
+			return uuid;
+		}
 
+		@Override
+		public boolean equals(Object other) {
+			SentryEventRequest otherRequest = (SentryEventRequest) other;
+			
+			if (this.uuid != null && otherRequest.uuid != null) {
+				return uuid.equals(otherRequest.uuid);
+			}
+			
+			return false;
+		}
+		
+	}
+
+	public static class SentryEventBuilder implements Serializable {
+
+		private static final long serialVersionUID = -8589756678369463988L;
+		
 		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		static {
 			sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -417,6 +549,17 @@ public class Sentry {
 			event = new HashMap<String, Object>();
 			event.put("event_id", UUID.randomUUID().toString().replace("-", ""));
 			this.setTimestamp(System.currentTimeMillis());
+		}
+		
+		public SentryEventBuilder(Throwable t, SentryEventLevel level) {
+			this();
+			
+			String culprit = getCause(t, t.getMessage());
+			
+			this.setMessage(t.getMessage())
+			.setCulprit(culprit)
+			.setLevel(level)
+			.setException(t);
 		}
 
 		/**
