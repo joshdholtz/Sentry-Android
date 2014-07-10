@@ -46,6 +46,9 @@ import org.json.JSONObject;
 import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -259,7 +262,24 @@ public class Sentry {
 
 	}
 
+	private static boolean isNetworkAvailable() {
+		PackageManager pm = Sentry.getInstance().context.getPackageManager();
+		int hasPerm = pm.checkPermission(android.Manifest.permission.ACCESS_NETWORK_STATE, Sentry.getInstance().context.getPackageName());
+		if (hasPerm == PackageManager.PERMISSION_DENIED) {
+		   return true;
+		}
+		
+	    ConnectivityManager connectivityManager = (ConnectivityManager) Sentry.getInstance().context.getSystemService(Context.CONNECTIVITY_SERVICE);
+	    NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+	    return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+	}
+	
 	private static void doCaptureEventPost(final SentryEventRequest request) {
+		
+		if (!isNetworkAvailable()) {
+			InternalStorage.getInstance().addRequest(request);
+			return;
+		}
 		
 		new AsyncTask<Void, Void, Void>(){
 			@Override
