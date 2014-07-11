@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.1.1** | Uncaught exception handler now calls SentryEventCaptureListener
 **1.1.0** | Saves requests that were captured offline or failed and tries to resend them when it can
 **1.0.0** | Removed dependency to `Protocol`; allows capture of message from background thread
 **0.1.0** | Initial release
