@@ -393,12 +393,12 @@ public class Sentry {
 			SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
 			if (Sentry.getInstance().captureListener != null) {
 				builder = Sentry.getInstance().captureListener.beforeCapture(builder);
-			}
 				
-			if (builder != null) {
-				InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
-			} else {
-				Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
+				if (builder != null) {
+					InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
+				} else {
+					Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
+				}
 			}
 
 			//call original handler  
