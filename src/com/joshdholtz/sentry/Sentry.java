@@ -235,7 +235,14 @@ public class Sentry {
 	public static void captureEvent(SentryEventBuilder builder) {
 		final SentryEventRequest request;
 		if (Sentry.getInstance().captureListener != null) {
-			request = new SentryEventRequest(Sentry.getInstance().captureListener.beforeCapture(builder));
+			
+			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+			if (builder == null) {
+				Log.e(Sentry.TAG, "SentryEventBuilder in captureEvent is null");
+				return;
+			}
+			
+			request = new SentryEventRequest(builder);
 		} else {
 			request = new SentryEventRequest(builder);
 		}
@@ -383,8 +390,14 @@ public class Sentry {
 		@Override
 		public void uncaughtException(Thread thread, Throwable e) {
 			// Here you should have a more robust, permanent record of problems
-			SentryEventBuilder eventBuilder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
-			InternalStorage.getInstance().addRequest(new SentryEventRequest(eventBuilder));
+			SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
+			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+				
+			if (builder != null) {
+				InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
+			} else {
+				Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
+			}
 
 			//call original handler  
 			defaultExceptionHandler.uncaughtException(thread, e);  
