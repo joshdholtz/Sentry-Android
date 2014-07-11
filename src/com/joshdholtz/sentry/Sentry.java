@@ -391,7 +391,9 @@ public class Sentry {
 		public void uncaughtException(Thread thread, Throwable e) {
 			// Here you should have a more robust, permanent record of problems
 			SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
-			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+			if (Sentry.getInstance().captureListener != null) {
+				builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+			}
 				
 			if (builder != null) {
 				InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
