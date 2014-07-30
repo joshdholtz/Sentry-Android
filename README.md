@@ -31,13 +31,14 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.1.2** | Bug fixed - Setting a `captureListener` was required to send a report (thanks [mathzol](https://github.com/mathzol))
 **1.1.1** | Uncaught exception handler now calls SentryEventCaptureListener
 **1.1.0** | Saves requests that were captured offline or failed and tries to resend them when it can
 **1.0.0** | Removed dependency to `Protocol`; allows capture of message from background thread
 **0.1.0** | Initial release
 
 ## How To Get Started
-- Download the [Sentry-Android JAR - v1.1.1](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.1.1)
+- Download the [Sentry-Android JAR - v1.1.2](https://github.com/joshdholtz/Sentry-Android/releases/tag/v1.1.2)
 - Place the JAR in the Android project's "libs" directory
 - Code
 
