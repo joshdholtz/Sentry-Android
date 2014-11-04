@@ -701,50 +701,78 @@ public class Sentry {
 		 * @param t
 		 * @return
 		 */
-		public SentryEventBuilder setException(Throwable t) {
-			Map<String, Object> exception = new HashMap<String, Object>();
-			exception.put("type", t.getClass().getSimpleName());
-			exception.put("value", t.getMessage());
-			exception.put("module", t.getClass().getPackage().getName());
+        public SentryEventBuilder setException(Throwable t) {
+            JSONArray values = new JSONArray();
 
-			event.put("sentry.interfaces.Exception", new JSONObject(exception));
-			try {
-				event.put("sentry.interfaces.Stacktrace", getStackTrace(t));
-			} catch (JSONException e) { e.printStackTrace(); }
+            while (t != null) {
+                JSONObject exception = new JSONObject();
 
-			return this;
-		}
+                try {
+                    exception.put("type", t.getClass().getSimpleName());
+                    exception.put("value", t.getMessage());
+                    exception.put("module", t.getClass().getPackage().getName());
+                    exception.put("stacktrace", getStackTrace(t));
 
-		public static JSONObject getStackTrace(Throwable t) throws JSONException {
-			JSONArray array = new JSONArray();
+                    values.put(exception);
+                } catch (JSONException e) {
+                    Log.e(TAG, "Failed to build sentry report for " + t, e);
+                }
 
-			while (t != null) {
-				StackTraceElement[] elements = t.getStackTrace();
-				for (int index = 0; index < elements.length; ++index) {
-					if (index == 0) {
-						JSONObject causedByFrame = new JSONObject();
-						String msg = "Caused by: " + t.getClass().getName();
-						if (t.getMessage() != null) {
-							msg += " (\"" + t.getMessage() + "\")";
-						}
-						causedByFrame.put("filename", msg);
-						causedByFrame.put("lineno", -1);
-						array.put(causedByFrame);
-					}
-					StackTraceElement element = elements[index];
-					JSONObject frame = new JSONObject();
-					frame.put("filename", element.getClassName());
-					frame.put("function", element.getMethodName());
-					frame.put("lineno", element.getLineNumber());
-					array.put(frame);
-				}
-				t = t.getCause();
-			}
-			JSONObject stackTrace = new JSONObject();
-			stackTrace.put("frames", array);
-			return stackTrace;
-		}
+                t = t.getCause();
+            }
 
-	}
+            JSONObject exceptionReport = new JSONObject();
+
+            try {
+                exceptionReport.put("values", values);
+                event.put("exception", exceptionReport);
+            } catch (JSONException e) {
+                Log.e(TAG, "Unable to attach exception to event " + values, e);
+            }
+
+            return this;
+        }
+
+        public static JSONObject getStackTrace(Throwable t) throws JSONException {
+            JSONArray frameList = new JSONArray();
+
+            for (StackTraceElement ste : t.getStackTrace()) {
+                JSONObject frame = new JSONObject();
+
+                String method = ste.getMethodName();
+                if (method.length() != 0) {
+                    frame.put("function", method);
+                }
+
+                int lineno = ste.getLineNumber();
+                if (!ste.isNativeMethod() && lineno >= 0) {
+                    frame.put("lineno", lineno);
+                }
+
+                boolean inApp = true;
+
+                String className = ste.getClassName();
+                frame.put("module", className);
+
+                // Take out some of the system packages to improve the exception folding on the sentry server
+                if (className.startsWith("android.")
+                        || className.startsWith("java.")
+                        || className.startsWith("dalvik.")
+                        || className.startsWith("com.android.")) {
+
+                    inApp = false;
+                        }
+
+                frame.put("in_app", inApp);
+
+                frameList.put(frame);
+            }
+
+            JSONObject frameHash = new JSONObject();
+            frameHash.put("frames", frameList);
+
+            return frameHash;
+        }
+    }
 
 }
