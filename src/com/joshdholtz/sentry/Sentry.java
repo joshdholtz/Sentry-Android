@@ -17,6 +17,8 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -44,9 +47,11 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
@@ -82,6 +87,7 @@ public class Sentry {
 	private String baseUrl;
 	private String dsn;
 	private String packageName;
+	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
 
 	private static final String TAG = "Sentry";
@@ -109,11 +115,32 @@ public class Sentry {
 		Sentry.getInstance().baseUrl = baseUrl;
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
+		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 
 		
 		Sentry.getInstance().setupUncaughtExceptionHandler();
 	}
 	
+	private static int getVerifySsl(String dsn) {
+		int verifySsl = 1;
+		List<NameValuePair> params = getAllGetParams(dsn);
+		for (NameValuePair param : params) {
+			if(param.getName().equals("verify_ssl"))
+				return Integer.parseInt(param.getValue());
+		}
+		return verifySsl;
+	}
+
+	private static List<NameValuePair> getAllGetParams(String dsn) {
+		List<NameValuePair> params = null;
+		try {
+			params = URLEncodedUtils.parse(new URI(dsn), "UTF-8");
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
+		}
+		return params;
+	}
+
 	private void setupUncaughtExceptionHandler() {
 		
 		UncaughtExceptionHandler currentHandler = Thread.getDefaultUncaughtExceptionHandler();
@@ -377,7 +404,13 @@ public class Sentry {
 			@Override
 			protected Void doInBackground(Void... params) {
 				
-				HttpClient httpClient = getHttpsClient(new DefaultHttpClient());
+				HttpClient httpClient;
+				if(Sentry.getInstance().verifySsl != 0) {
+					httpClient = new DefaultHttpClient();
+				}
+				else {
+					httpClient = getHttpsClient(new DefaultHttpClient());
+				}
 				HttpPost httpPost = new HttpPost(Sentry.getInstance().baseUrl + "/api/" + getProjectId() + "/store/");
 
 				int TIMEOUT_MILLISEC = 10000;  // = 20 seconds
