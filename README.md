@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.1.4** | Added support for verify_ssl on DSN (thanks [Kras4ooo](https://github.com/Kras4ooo))
 **1.1.3** | Exceptions appear super mega awesome in Sentry now (thanks [doapp-jeremiah](https://github.com/doapp-jeremiah))
 **1.1.2** | Bug fixed - Setting a `captureListener` was required to send a report (thanks [mathzol](https://github.com/mathzol))
 **1.1.1** | Uncaught exception handler now calls SentryEventCaptureListener
@@ -39,7 +40,7 @@ Version | Changes
 **0.1.0** | Initial release
 
 ## How To Get Started
-- Download the [Sentry-Android JAR - 1.1.3](https://github.com/joshdholtz/Sentry-Android/releases/tag/1.1.3)
+- Download the [Sentry-Android JAR - 1.1.4](https://github.com/joshdholtz/Sentry-Android/releases/tag/1.1.4)
 - Place the JAR in the Android project's "libs" directory
 - Code
 
