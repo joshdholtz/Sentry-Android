@@ -399,10 +399,9 @@ public class Sentry {
 			InternalStorage.getInstance().addRequest(request);
 			return;
 		}
-		
-		new AsyncTask<Void, Void, Void>(){
-			@Override
-			protected Void doInBackground(Void... params) {
+
+        new Thread(new Runnable() {
+            @Override public void run() {
 				
 				HttpClient httpClient;
 				if(Sentry.getInstance().verifySsl != 0) {
@@ -469,7 +468,6 @@ public class Sentry {
 					InternalStorage.getInstance().addRequest(request);
 				}
 
-				return null;
 			}
 
 			private byte[] readBytes(InputStream inputStream) throws IOException { 
@@ -490,9 +488,9 @@ public class Sentry {
 				return byteBuffer.toByteArray();
 			}
 
-		}.execute();
+        }).start();
 
-	}
+    }
 
 	private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
