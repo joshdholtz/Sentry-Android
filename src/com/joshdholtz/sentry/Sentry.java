@@ -583,7 +583,7 @@ public class Sentry {
 
     }
 
-    public static class SentryEventBuilder implements Serializable {
+    public static class SentryEventBuilder implements java.io.Serializable {
 
         private static final long serialVersionUID = -8589756678369463988L;
 
