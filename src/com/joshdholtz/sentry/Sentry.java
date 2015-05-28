@@ -420,7 +420,7 @@ public class Sentry {
         if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
             // Register default exceptions handler
             Thread.setDefaultUncaughtExceptionHandler(
-                    new SentryUncaughtExceptionHandler(currentHandler, context));
+                    new SentryUncaughtExceptionHandler(currentHandler));
         }
 
         sendAllCachedCapturedEvents();
@@ -839,12 +839,10 @@ public class Sentry {
     private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
         private UncaughtExceptionHandler defaultExceptionHandler;
-        private Context context;
 
         // constructor
-        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, Context context) {
+        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler) {
             defaultExceptionHandler = pDefaultExceptionHandler;
-            this.context = context;
         }
 
         @Override
