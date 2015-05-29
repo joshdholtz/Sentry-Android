@@ -74,13 +74,18 @@ import javax.net.ssl.X509TrustManager;
 
 public class Sentry {
 
-    private final static String VERSION = "0.1.2";
+    private final static String VERSION = "0.1.3";
     private static final String TAG = "Sentry";
     private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
+
+    public static final boolean QUIET_LOGGING = true;
+    public static final boolean NOISY_LOGGING = false;
+
     private Context context;
     private String baseUrl;
     private String dsn;
     private String packageName;
+    private boolean isQuiet;
     private int verifySsl;
     private SentryEventCaptureListener captureListener;
 
@@ -97,15 +102,24 @@ public class Sentry {
     }
 
     public static void init(Context context, String baseUrl, String dsn) {
+        Sentry.init(context, baseUrl, dsn, false);
+    }
+
+    public static void init(Context context, String baseUrl, String dsn, boolean isQuiet) {
         Sentry.getInstance().context = context;
 
         Sentry.getInstance().baseUrl = baseUrl;
         Sentry.getInstance().dsn = dsn;
         Sentry.getInstance().packageName = context.getPackageName();
+        Sentry.getInstance().isQuiet = isQuiet;
         Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 
 
         Sentry.getInstance().setupUncaughtExceptionHandler();
+    }
+
+    private static boolean isQuiet() {
+        return Sentry.getInstance().isQuiet;
     }
 
     private static int getVerifySsl(String dsn) {
@@ -123,7 +137,7 @@ public class Sentry {
         try {
             params = URLEncodedUtils.parse(new URI(dsn), "UTF-8");
         } catch (URISyntaxException e) {
-            e.printStackTrace();
+            printException(e);
         }
         return params;
     }
@@ -132,7 +146,7 @@ public class Sentry {
         String header = "";
 
         Uri uri = Uri.parse(Sentry.getInstance().dsn);
-        Log.d("Sentry", "URI - " + uri);
+        SentryLog.d("URI - " + uri);
         String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
 
         String[] authorityParts = authority.split(":");
@@ -158,7 +172,7 @@ public class Sentry {
 
     public static void sendAllCachedCapturedEvents() {
         ArrayList<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
-        Log.d(Sentry.TAG, "Sending up " + unsentRequests.size() + " cached response(s)");
+        SentryLog.d("Sending up " + unsentRequests.size() + " cached response(s)");
         for (SentryEventRequest request : unsentRequests) {
             Sentry.doCaptureEventPost(request);
         }
@@ -208,7 +222,7 @@ public class Sentry {
 
             // Embed version in stacktrace filename
             File stacktrace = new File(getStacktraceLocation(context), "raven-" + String.valueOf(random) + ".stacktrace");
-            Log.d(TAG, "Writing unhandled exception to: " + stacktrace.getAbsolutePath());
+            SentryLog.d("Writing unhandled exception to: " + stacktrace.getAbsolutePath());
 
             // Write the stacktrace to disk
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(stacktrace));
@@ -218,10 +232,10 @@ public class Sentry {
             oos.close();
         } catch (Exception ebos) {
             // Nothing much we can do about this - the game is over
-            ebos.printStackTrace();
+            printException(ebos);
         }
 
-        Log.d(TAG, result.toString());
+        SentryLog.d(result.toString());
     }
 
     private static String getCause(Throwable t, String culprit) {
@@ -252,7 +266,7 @@ public class Sentry {
 
             builder = Sentry.getInstance().captureListener.beforeCapture(builder);
             if (builder == null) {
-                Log.e(Sentry.TAG, "SentryEventBuilder in captureEvent is null");
+                SentryLog.e("SentryEventBuilder in captureEvent is null");
                 return;
             }
 
@@ -261,7 +275,7 @@ public class Sentry {
             request = new SentryEventRequest(builder);
         }
 
-        Log.d(TAG, "Request - " + request.getRequestData());
+        SentryLog.d("Request - " + request.getRequestData());
         doCaptureEventPost(request);
 
     }
@@ -353,7 +367,7 @@ public class Sentry {
                             byteResp = this.readBytes(in);
 
                         } catch (IOException e) {
-                            e.printStackTrace();
+                            printException(e);
                         }
                     }
 
@@ -365,18 +379,18 @@ public class Sentry {
                         cbuf = decoder.decode(ByteBuffer.wrap(byteResp));
                         stringResponse = cbuf.toString();
                     } catch (CharacterCodingException e) {
-                        e.printStackTrace();
+                        printException(e);
                     }
 
                     success = (status == 200);
 
-                    Log.d(TAG, "SendEvent - " + status + " " + stringResponse);
+                    SentryLog.d("SendEvent - " + status + " " + stringResponse);
                 } catch (ClientProtocolException e) {
-                    e.printStackTrace();
+                    printException(e);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    printException(e);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    printException(e);
                 }
 
                 if (success) {
@@ -413,7 +427,7 @@ public class Sentry {
 
         UncaughtExceptionHandler currentHandler = Thread.getDefaultUncaughtExceptionHandler();
         if (currentHandler != null) {
-            Log.d("Debugged", "current handler class=" + currentHandler.getClass().getName());
+            SentryLog.d("current handler class=" + currentHandler.getClass().getName());
         }
 
         // don't register again if already registered
@@ -488,7 +502,7 @@ public class Sentry {
 
         public void addRequest(SentryEventRequest request) {
             synchronized (this) {
-                Log.d(Sentry.TAG, "Adding request - " + request.uuid);
+                SentryLog.d("Adding request - " + request.uuid);
                 if (!this.unsentRequests.contains(request)) {
                     this.unsentRequests.add(request);
                     this.writeObject(Sentry.getInstance().context, this.unsentRequests);
@@ -498,7 +512,7 @@ public class Sentry {
 
         public void removeBuilder(SentryEventRequest request) {
             synchronized (this) {
-                Log.d(Sentry.TAG, "Removing request - " + request.uuid);
+                SentryLog.d("Removing request - " + request.uuid);
                 this.unsentRequests.remove(request);
                 this.writeObject(Sentry.getInstance().context, this.unsentRequests);
             }
@@ -512,9 +526,9 @@ public class Sentry {
                 oos.close();
                 fos.close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                printException(e);
             } catch (IOException e) {
-                e.printStackTrace();
+                printException(e);
             }
         }
 
@@ -525,13 +539,13 @@ public class Sentry {
                 ArrayList<SentryEventRequest> requests = (ArrayList<SentryEventRequest>) ois.readObject();
                 return requests;
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                printException(e);
             } catch (StreamCorruptedException e) {
-                e.printStackTrace();
+                printException(e);
             } catch (IOException e) {
-                e.printStackTrace();
+                printException(e);
             } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+                printException(e);
             }
             return new ArrayList<SentryEventRequest>();
         }
@@ -801,7 +815,7 @@ public class Sentry {
 
                     values.put(exception);
                 } catch (JSONException e) {
-                    Log.e(TAG, "Failed to build sentry report for " + t, e);
+                    SentryLog.e("Failed to build sentry report for " + t, e);
                 }
 
                 t = t.getCause();
@@ -813,7 +827,7 @@ public class Sentry {
                 exceptionReport.put("values", values);
                 event.put("exception", exceptionReport);
             } catch (JSONException e) {
-                Log.e(TAG, "Unable to attach exception to event " + values, e);
+                SentryLog.e("Unable to attach exception to event " + values, e);
             }
 
             return this;
@@ -856,13 +870,36 @@ public class Sentry {
             if (builder != null) {
                 InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
             } else {
-                Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
+                SentryLog.e("SentryEventBuilder in uncaughtException is null");
             }
 
             //call original handler
             defaultExceptionHandler.uncaughtException(thread, e);
         }
 
+    }
+
+    private static class SentryLog {
+        protected static void d(String msg, Throwable tr) {
+            if (isQuiet()) return;
+            Log.d(Sentry.TAG, msg, tr);
+        }
+        protected static void d(String msg) {
+            SentryLog.d(msg, null);
+        }
+        protected static void e(String msg, Throwable tr) {
+            if (isQuiet()) return;
+            Log.e(Sentry.TAG, msg, tr);
+        }
+        protected static void e(String msg) {
+            SentryLog.e(msg, null);
+        }
+
+    }
+
+    private static <T extends Throwable> void printException(T obj) {
+        if (isQuiet()) return;
+        obj.printStackTrace();
     }
 
 }
