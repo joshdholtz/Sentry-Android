@@ -1,10 +1,13 @@
 package com.joshdholtz.sentry;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.SSLCertificateSocketFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.util.Log;
 
 import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
@@ -12,15 +15,18 @@ import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.LayeredSocketFactory;
+import org.apache.http.conn.scheme.PlainSocketFactory;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.StrictHostnameVerifier;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.json.JSONArray;
@@ -42,10 +48,10 @@ import java.io.StreamCorruptedException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -68,13 +74,18 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 public class Sentry {
 
-    private final static String VERSION = "0.1.3";
+    private final static String VERSION = "0.1.4";
     private static final String TAG = "Sentry";
     private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
 
@@ -87,6 +98,8 @@ public class Sentry {
     private String packageName;
     private boolean isQuiet;
     private int verifySsl;
+    private int keystoreRawId = 0;
+    private String keystorePw;
     private SentryEventCaptureListener captureListener;
 
     private Sentry() {
@@ -102,20 +115,51 @@ public class Sentry {
     }
 
     public static void init(Context context, String baseUrl, String dsn) {
-        Sentry.init(context, baseUrl, dsn, false);
+        Sentry.init(context, baseUrl, dsn, false, null);
     }
 
     public static void init(Context context, String baseUrl, String dsn, boolean isQuiet) {
+        Sentry.init(context, baseUrl, dsn, isQuiet, null);
+    }
+
+    public static void init(Context context, String baseUrl, String dsn, boolean isQuiet,
+                            SentryKeyStore sentryKeyStore) {
         Sentry.getInstance().context = context;
 
         Sentry.getInstance().baseUrl = baseUrl;
         Sentry.getInstance().dsn = dsn;
         Sentry.getInstance().packageName = context.getPackageName();
         Sentry.getInstance().isQuiet = isQuiet;
-        Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 
+        if (sentryKeyStore == null || sentryKeyStore.getRawId() == 0) {
+            Sentry.getInstance().verifySsl = getVerifySsl(dsn);
+        } else {
+            Sentry.getInstance().keystoreRawId = sentryKeyStore.getRawId();
+            Sentry.getInstance().keystorePw = sentryKeyStore.getPw();
+
+            Sentry.getInstance().verifySsl = 2;
+        }
 
         Sentry.getInstance().setupUncaughtExceptionHandler();
+    }
+
+    public static class SentryKeyStore {
+        int rawId;
+        String storePw;
+
+        public SentryKeyStore(int rawId, String storePw) {
+            this.rawId = rawId;
+            this.storePw = storePw;
+        }
+
+        public String getPw() {
+            return storePw;
+        }
+
+        public int getRawId() {
+            return rawId;
+        }
+
     }
 
     private static boolean isQuiet() {
@@ -292,38 +336,6 @@ public class Sentry {
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 
-    public static HttpClient getHttpsClient(HttpClient client) {
-        try {
-            X509TrustManager x509TrustManager = new X509TrustManager() {
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain,
-                                               String authType) throws CertificateException {
-                }
-
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain,
-                                               String authType) throws CertificateException {
-                }
-
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-            };
-
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{x509TrustManager}, null);
-            SSLSocketFactory sslSocketFactory = new ExSSLSocketFactory(sslContext);
-            sslSocketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-            ClientConnectionManager clientConnectionManager = client.getConnectionManager();
-            SchemeRegistry schemeRegistry = clientConnectionManager.getSchemeRegistry();
-            schemeRegistry.register(new Scheme("https", sslSocketFactory, 443));
-            return new DefaultHttpClient(clientConnectionManager, client.getParams());
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     private static void doCaptureEventPost(final SentryEventRequest request) {
 
         if (!shouldAttemptPost()) {
@@ -335,12 +347,8 @@ public class Sentry {
             @Override
             public void run() {
 
-                HttpClient httpClient;
-                if (Sentry.getInstance().verifySsl != 0) {
-                    httpClient = new DefaultHttpClient();
-                } else {
-                    httpClient = getHttpsClient(new DefaultHttpClient());
-                }
+                SentryHttpClient httpClient = new SentryHttpClient(Sentry.getInstance().context);
+
                 HttpPost httpPost = new HttpPost(Sentry.getInstance().baseUrl + "/api/" + getProjectId() + "/store/");
 
                 int TIMEOUT_MILLISEC = 10000;  // = 20 seconds
@@ -444,39 +452,168 @@ public class Sentry {
         private static Sentry instance = new Sentry();
     }
 
-    public static class ExSSLSocketFactory extends SSLSocketFactory {
-        SSLContext sslContext = SSLContext.getInstance("TLS");
+    public static class CustomSSLSocketFactory extends SSLSocketFactory implements LayeredSocketFactory {
+        SSLContext sslContext;
+        KeyStore keyStore;
 
-        public ExSSLSocketFactory(KeyStore truststore) throws NoSuchAlgorithmException, KeyManagementException, KeyStoreException, UnrecoverableKeyException {
+        private final static HostnameVerifier hostnameVerifier = new StrictHostnameVerifier();
+
+        public CustomSSLSocketFactory(KeyStore truststore)
+                throws NoSuchAlgorithmException, KeyManagementException,
+                KeyStoreException, UnrecoverableKeyException {
             super(truststore);
-            TrustManager x509TrustManager = new X509TrustManager() {
-                public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                }
 
-                public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                }
-
-                public X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-            };
-
-            sslContext.init(null, new TrustManager[]{x509TrustManager}, null);
+            sslContext = SSLContext.getInstance("TLS");
+            keyStore = truststore;
         }
 
-        public ExSSLSocketFactory(SSLContext context) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
+        public CustomSSLSocketFactory(SSLContext context)
+                throws KeyManagementException, NoSuchAlgorithmException,
+                KeyStoreException, UnrecoverableKeyException {
             super(null);
             sslContext = context;
         }
 
+        public static class NoVerificationX509TrustManager implements X509TrustManager {
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+
+            }
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+
+            }
+
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+                return null;
+            }
+        }
+
         @Override
-        public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException, UnknownHostException {
-            return sslContext.getSocketFactory().createSocket(socket, host, port, autoClose);
+        @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
+        public Socket createSocket(Socket socket, String host, int port,
+                                   boolean autoClose) throws IOException {
+            if (autoClose) {
+                // we don't need the plainSocket
+                socket.close();
+            }
+
+            SSLCertificateSocketFactory sslSocketFactory =
+                    (SSLCertificateSocketFactory) SSLCertificateSocketFactory.getDefault(0);
+
+            TrustManager[] trustManagers = null;
+
+            try {
+                int verifySsl = Sentry.getInstance().verifySsl;
+                int keystoreRawId = Sentry.getInstance().keystoreRawId;
+
+                SentryLog.d("VerifySSL is " + verifySsl + " " + ((keystoreRawId == 0) ? "No keystore" : "Keystore provided"));
+                if (verifySsl >= 1) {
+                    if (verifySsl == 2) {
+                        try {
+                            InputStream in = Sentry.getInstance().context.getResources().openRawResource(keystoreRawId);
+                            try {
+                                keyStore.load(in, Sentry.getInstance().keystorePw.toCharArray());
+                            } finally {
+                                in.close();
+                            }
+                            SentryLog.d("Keystore loaded");
+                        } catch (Exception e) {
+                            throw new AssertionError(e);
+                        }
+                    } else {
+                        keyStore = null;
+                    }
+
+                    TrustManagerFactory tmf = TrustManagerFactory.getInstance("X509");
+                    tmf.init(keyStore);
+                    trustManagers = tmf.getTrustManagers();
+
+                    setHostnameVerifier(SSLSocketFactory.STRICT_HOSTNAME_VERIFIER);
+                } else {
+                    SentryLog.d("Trusting all SSL certs");
+
+                    trustManagers = new TrustManager[] { new NoVerificationX509TrustManager() };
+                    setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+                }
+
+            } catch (Exception e) {
+            }
+
+            sslSocketFactory.setTrustManagers(trustManagers);
+
+            SSLSocket ssl = (SSLSocket) sslSocketFactory.createSocket(InetAddress.getByName(host), port);
+
+            ssl.setEnabledProtocols(ssl.getSupportedProtocols());
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                sslSocketFactory.setHostname(ssl, host);
+            } else {
+                try {
+                    java.lang.reflect.Method setHostnameMethod = ssl.getClass().getMethod("setHostname", String.class);
+                    setHostnameMethod.invoke(ssl, host);
+                } catch (Exception e) {
+                }
+            }
+
+            SSLSession session = ssl.getSession();
+            if (Sentry.getInstance().verifySsl == 1 && !hostnameVerifier.verify(host, session)) {
+                throw new SSLPeerUnverifiedException("Cannot verify hostname: " + host);
+            }
+
+            return ssl;
         }
 
         @Override
         public Socket createSocket() throws IOException {
-            return sslContext.getSocketFactory().createSocket();
+            return null;
+        }
+
+        @Override
+        public Socket connectSocket(Socket s, String host, int port, InetAddress localAddress, int localPort,
+                                    HttpParams params) throws IOException {
+            return null;
+        }
+
+        @Override
+        public boolean isSecure(Socket s) throws IllegalArgumentException {
+            if (s instanceof SSLSocket) {
+                return s.isConnected();
+            }
+            return false;
+        }
+    }
+
+    public static class SentryHttpClient extends DefaultHttpClient {
+        final Context context;
+
+        public SentryHttpClient(Context context) {
+            this.context = context;
+        }
+
+        @Override
+        protected ClientConnectionManager createClientConnectionManager() {
+            SchemeRegistry registry = new SchemeRegistry();
+
+            registry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+            registry.register(new Scheme("https", newSslSocketFactory(), 443));
+
+            return new ThreadSafeClientConnManager(getParams(), registry);
+        }
+
+        private SSLSocketFactory newSslSocketFactory() {
+            try {
+                // Get an instance of the Bouncy Castle KeyStore format
+                KeyStore trusted = KeyStore.getInstance("BKS");
+
+                SSLSocketFactory sf = new CustomSSLSocketFactory(trusted);
+
+                return sf;
+            } catch (Exception e) {
+                throw new AssertionError(e);
+            }
         }
     }
 
