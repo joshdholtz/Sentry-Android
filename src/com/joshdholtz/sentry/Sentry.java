@@ -734,6 +734,29 @@ public class Sentry {
 			event.put("culprit", culprit);
 			return this;
 		}
+		
+		/**
+		 * 
+		 * @param tags
+		 * @return
+		 */
+		public SentryEventBuilder setUser(Map<String,String> user) {
+			setUser(new JSONObject(user));
+			return this;
+		}
+
+		public SentryEventBuilder setUser(JSONObject user) {
+			event.put("user", user);
+			return this;
+		}
+
+		public JSONObject getUser() {
+			if (!event.containsKey("user")) {
+				setTags(new HashMap<String, String>());
+			}
+
+			return (JSONObject) event.get("user");
+		}
 
 		/**
 		 * 
