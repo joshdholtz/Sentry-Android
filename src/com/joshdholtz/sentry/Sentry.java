@@ -815,6 +815,11 @@ public class Sentry {
             return this;
         }
 
+        public SentryEventBuilder setRelease(String release) {
+            event.put("release", release);
+            return this;
+        }
+
         /**
          * "timestamp": "2011-05-02T17:41:36"
          *
