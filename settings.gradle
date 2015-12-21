@@ -1,1 +1,1 @@
-include ':app', ':sentry-android'
+include ':sentry-android', ':sentry-app'
