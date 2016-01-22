@@ -42,9 +42,15 @@ Version | Changes
 **0.1.0** | Initial release
 
 ## How To Get Started
-- Download the [Sentry-Android JAR - 1.1.4](https://github.com/joshdholtz/Sentry-Android/releases/tag/1.1.4)
-- Place the JAR in the Android project's "libs" directory
-- Code
+
+### Gradle
+Available in jCenter
+```
+compile 'com.joshdholtz.sentry:sentry-android:1.2.1'
+```
+
+### Manual
+JAR can be downloaded [here](https://bintray.com/joshdholtz/maven/sentry-android/view#files/com/joshdholtz/sentry/sentry-android/1.2.1)
 
 ## This Is How We Do It
 
