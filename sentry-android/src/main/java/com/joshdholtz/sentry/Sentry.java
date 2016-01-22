@@ -687,8 +687,8 @@ public class Sentry {
 
 		/**
 		 * "message": "SyntaxError: Wattttt!"
-		 * @param message
-		 * @return
+		 * @param message Message
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setMessage(String message) {
 			event.put("message", message);
@@ -697,8 +697,8 @@ public class Sentry {
 
 		/**
 		 * "timestamp": "2011-05-02T17:41:36"
-		 * @param timestamp
-		 * @return
+		 * @param timestamp Timestamp
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setTimestamp(long timestamp) {
 			event.put("timestamp", sdf.format(new Date(timestamp)));
@@ -707,8 +707,8 @@ public class Sentry {
 
 		/**
 		 * "level": "warning"
-		 * @param level
-		 * @return
+		 * @param level Level
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setLevel(SentryEventLevel level) {
 			event.put("level", level.value);
@@ -717,8 +717,8 @@ public class Sentry {
 
 		/**
 		 * "logger": "my.logger.name"
-		 * @param logger
-		 * @return
+		 * @param logger Logger
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setLogger(String logger) {
 			event.put("logger", logger);
@@ -727,8 +727,8 @@ public class Sentry {
 
 		/**
 		 * "culprit": "my.module.function_name"
-		 * @param culprit
-		 * @return
+		 * @param culprit Culprit
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setCulprit(String culprit) {
 			event.put("culprit", culprit);
@@ -737,8 +737,8 @@ public class Sentry {
 		
 		/**
 		 * 
-		 * @param tags
-		 * @return
+		 * @param user User
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setUser(Map<String,String> user) {
 			setUser(new JSONObject(user));
@@ -760,8 +760,8 @@ public class Sentry {
 
 		/**
 		 * 
-		 * @param tags
-		 * @return
+		 * @param tags Tags
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setTags(Map<String,String> tags) {
 			setTags(new JSONObject(tags));
@@ -783,8 +783,8 @@ public class Sentry {
 
 		/**
 		 * 
-		 * @param serverName
-		 * @return
+		 * @param serverName Server name
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setServerName(String serverName) {
 			event.put("server_name", serverName);
@@ -793,9 +793,9 @@ public class Sentry {
 
 		/**
 		 * 
-		 * @param name
-		 * @param version
-		 * @return
+		 * @param name Name
+		 * @param version Version
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder addModule(String name, String version) {
 			JSONArray modules;
@@ -816,8 +816,8 @@ public class Sentry {
 
 		/**
 		 * 
-		 * @param extra
-		 * @return
+		 * @param extra Extra
+		 * @return SentryEventBuilder
 		 */
 		public SentryEventBuilder setExtra(Map<String,String> extra) {
 			setExtra(new JSONObject(extra));
@@ -839,8 +839,8 @@ public class Sentry {
 
 		/**
 		 *
-		 * @param t
-		 * @return
+		 * @param t Throwable
+		 * @return SentryEventBuilder
 		 */
         public SentryEventBuilder setException(Throwable t) {
             JSONArray values = new JSONArray();

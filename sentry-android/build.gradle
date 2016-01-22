@@ -25,3 +25,30 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.1.1'
     provided 'org.jbundle.util.osgi.wrapped:org.jbundle.util.osgi.wrapped.org.apache.http.client:4.1.2'
 }
+
+ext {
+    bintrayRepo = 'maven'
+    bintrayName = 'sentry-android'
+
+    publishedGroupId = 'com.joshdholtz.sentry'
+    libraryName = 'sentry-android'
+    artifact = 'sentry-android'
+
+    libraryDescription = 'A Sentry client for Android'
+
+    siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
+    gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
+
+    libraryVersion = '1.2.0'
+
+    developerId = 'joshdholtz'
+    developerName = 'Josh Holtz'
+    developerEmail = 'josh@rokkincat.com'
+
+    licenseName = 'The MIT License (MIT)'
+    licenseUrl = 'http://opensource.org/licenses/mit-license.php'
+    allLicenses = ["MIT"]
+}
+
+apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
+apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
