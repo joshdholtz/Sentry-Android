@@ -424,7 +424,7 @@ public class Sentry {
 					httpPost.setHeader("User-Agent", "sentry-android/" + VERSION);
 					httpPost.setHeader("Content-Type", "text/html; charset=utf-8");
 
-					httpPost.setEntity(new StringEntity(request.getRequestData()));
+					httpPost.setEntity(new StringEntity(request.getRequestData(), "utf-8"));
 					HttpResponse httpResponse = httpClient.execute(httpPost);
 
 					int status = httpResponse.getStatusLine().getStatusCode();
