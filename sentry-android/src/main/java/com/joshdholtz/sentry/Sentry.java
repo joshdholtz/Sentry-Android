@@ -671,6 +671,7 @@ public class Sentry {
 		public SentryEventBuilder() {
 			event = new HashMap<String, Object>();
 			event.put("event_id", UUID.randomUUID().toString().replace("-", ""));
+			event.put("platform", "java");
 			this.setTimestamp(System.currentTimeMillis());
 		}
 		
