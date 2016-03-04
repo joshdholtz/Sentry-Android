@@ -790,6 +790,16 @@ public class Sentry {
 			event.put("server_name", serverName);
 			return this;
 		}
+		
+		/**
+		 * 
+		 * @param release Release
+		 * @return SentryEventBuilder
+		 */
+		public SentryEventBuilder setRelease(String release) {
+			event.put("release", release);
+			return this;
+		}
 
 		/**
 		 * 
