@@ -671,6 +671,7 @@ public class Sentry {
 		public SentryEventBuilder() {
 			event = new HashMap<String, Object>();
 			event.put("event_id", UUID.randomUUID().toString().replace("-", ""));
+			event.put("platform", "java");
 			this.setTimestamp(System.currentTimeMillis());
 		}
 		
@@ -788,6 +789,16 @@ public class Sentry {
 		 */
 		public SentryEventBuilder setServerName(String serverName) {
 			event.put("server_name", serverName);
+			return this;
+		}
+		
+		/**
+		 * 
+		 * @param release Release
+		 * @return SentryEventBuilder
+		 */
+		public SentryEventBuilder setRelease(String release) {
+			event.put("release", release);
 			return this;
 		}
 
