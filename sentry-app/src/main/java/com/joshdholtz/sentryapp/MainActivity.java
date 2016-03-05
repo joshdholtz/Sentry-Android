@@ -14,7 +14,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        String yourDSN = "";
+        String yourDSN = "https://74ad3a2738794210abad1300ae38b5d1:8504db06fd014286bb4e998fcc30b743@app.getsentry.com/61891";
         Sentry.init(this, yourDSN);
         Sentry.captureMessage("OMG this works woooo");
     }
