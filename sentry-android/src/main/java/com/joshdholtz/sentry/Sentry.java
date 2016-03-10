@@ -541,11 +541,11 @@ public class Sentry {
 		private InternalStorage() {
 			Context context = Sentry.getInstance().context;
 			try {
-				File unsetRequestsFile = new File(getFilesDir(), FILE_NAME);
+				File unsetRequestsFile = new File(context.getFilesDir(), FILE_NAME);
 				if (!unsetRequestsFile.exists()) {
 					writeObject(context, new ArrayList<Sentry.SentryEventRequest>());
 				}
-			} catch (IOException e) {
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
 			this.unsentRequests = this.readObject(context);
