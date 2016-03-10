@@ -539,7 +539,16 @@ public class Sentry {
 		}
 		
 		private InternalStorage() {
-			this.unsentRequests = this.readObject(Sentry.getInstance().context);
+			Context context = Sentry.getInstance().context;
+			try {
+				File unsetRequestsFile = new File(getFilesDir(), FILE_NAME);
+				if (!unsetRequestsFile.exists()) {
+					writeObject(context, new ArrayList<Sentry.SentryEventRequest>());
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			this.unsentRequests = this.readObject(context);
 		}		
 		
 		/**
@@ -586,6 +595,8 @@ public class Sentry {
 				FileInputStream fis = context.openFileInput(FILE_NAME);
 				ObjectInputStream ois = new ObjectInputStream(fis);
 				ArrayList<SentryEventRequest> requests = (ArrayList<SentryEventRequest>) ois.readObject();
+				ois.close();
+				fis.close();
 				return requests;
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
