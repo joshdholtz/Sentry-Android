@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="protocol-1.0.4">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/libs/protocol-1.0.4.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
