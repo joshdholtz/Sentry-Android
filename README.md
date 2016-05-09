@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.4.0** | Fixes issues when using self-hosted Sentry server
 **1.2.1** | Sends up data to Sentry as UTF-8
 **1.2.0** | Added support for Android version 23 and made library avaiable to install via gradle
 **1.1.4** | Added support for verify_ssl on DSN (thanks [Kras4ooo](https://github.com/Kras4ooo))
@@ -46,7 +47,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.2.1'
+compile 'com.joshdholtz.sentry:sentry-android:1.4.0'
 ```
 
 ### Manual
