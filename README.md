@@ -74,7 +74,7 @@ Sentry.captureMessage("Something significant may have happened");
 ### Capture a caught exception
 ``` java
 try {
-	JSONObject obj = new JSONObjet();
+	JSONObject obj = new JSONObject();
 } catch (JSONException e) { 
 	Sentry.captureException(e);
 }
