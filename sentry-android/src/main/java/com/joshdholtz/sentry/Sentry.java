@@ -61,6 +61,8 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -84,6 +86,8 @@ public class Sentry {
 
 	private Context context;
 
+	public static String sentryVersion = "7";
+
 	private String baseUrl;
 	private String dsn;
 	private String packageName;
@@ -106,13 +110,11 @@ public class Sentry {
 	}
 
 	public static void init(Context context, String dsn) {
-		Sentry.init(context, DEFAULT_BASE_URL, dsn);
-	}
-
-	public static void init(Context context, String baseUrl, String dsn) {
 		Sentry.getInstance().context = context;
 
-		Sentry.getInstance().baseUrl = baseUrl;
+		Uri uri = Uri.parse(dsn);
+
+		Sentry.getInstance().baseUrl = uri.getScheme() + "://" + uri.getHost();
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
@@ -134,7 +136,7 @@ public class Sentry {
 	private static List<NameValuePair> getAllGetParams(String dsn) {
 		List<NameValuePair> params = null;
 		try {
-			params = URLEncodedUtils.parse(new URI(dsn), "UTF-8");
+			params = URLEncodedUtils.parse(new URI(dsn), HTTP.UTF_8);
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		}
@@ -162,14 +164,14 @@ public class Sentry {
 		String header = "";
 
 		Uri uri = Uri.parse(Sentry.getInstance().dsn);
-		Log.d("Sentry", "URI - " + uri);
+
 		String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
 
 		String[] authorityParts = authority.split(":");
 		String publicKey = authorityParts[0];
 		String secretKey = authorityParts[1];
 
-		header += "Sentry sentry_version=4,";
+		header += "Sentry sentry_version=" + sentryVersion + ",";
 		header += "sentry_client=sentry-android/" + VERSION + ",";
 		header += "sentry_timestamp=" + System.currentTimeMillis() +",";
 		header += "sentry_key=" + publicKey + ",";
@@ -403,28 +405,39 @@ public class Sentry {
 		new AsyncTask<Void, Void, Void>(){
 			@Override
 			protected Void doInBackground(Void... params) {
-				
+
+				int projectId = Integer.parseInt(getProjectId());
+				String url = Sentry.getInstance().baseUrl + "/api/" + projectId + "/store/";
+
+				Log.d(TAG, "Sending to URL - " + url);
+
 				HttpClient httpClient;
 				if(Sentry.getInstance().verifySsl != 0) {
+					Log.d(TAG, "Using http client");
 					httpClient = new DefaultHttpClient();
 				}
 				else {
+					Log.d(TAG, "Using https client");
 					httpClient = getHttpsClient(new DefaultHttpClient());
 				}
-				HttpPost httpPost = new HttpPost(Sentry.getInstance().baseUrl + "/api/" + getProjectId() + "/store/");
+
+				HttpPost httpPost = new HttpPost(url);
 
 				int TIMEOUT_MILLISEC = 10000;  // = 20 seconds
 				HttpParams httpParams = httpPost.getParams();
 				HttpConnectionParams.setConnectionTimeout(httpParams, TIMEOUT_MILLISEC);
 				HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
 
+				HttpProtocolParams.setContentCharset(httpParams, HTTP.UTF_8);
+				HttpProtocolParams.setHttpElementCharset(httpParams, HTTP.UTF_8);
+
 				boolean success = false;
 				try {
 					httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader());
 					httpPost.setHeader("User-Agent", "sentry-android/" + VERSION);
-					httpPost.setHeader("Content-Type", "text/html; charset=utf-8");
+					httpPost.setHeader("Content-Type", "application/json; charset=utf-8");
 
-					httpPost.setEntity(new StringEntity(request.getRequestData(), "utf-8"));
+					httpPost.setEntity(new StringEntity(request.getRequestData(), HTTP.UTF_8));
 					HttpResponse httpResponse = httpClient.execute(httpPost);
 
 					int status = httpResponse.getStatusLine().getStatusCode();
