@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -189,7 +190,7 @@ public class Sentry {
 	}
 
 	public static void sendAllCachedCapturedEvents() {
-		ArrayList<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
+		List<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
 		Log.d(Sentry.TAG, "Sending up " + unsentRequests.size() + " cached response(s)");
 		for (SentryEventRequest request : unsentRequests) {
 			Sentry.doCaptureEventPost(request);
@@ -541,7 +542,7 @@ public class Sentry {
 	private static class InternalStorage {
 
 		private final static String FILE_NAME = "unsent_requests";
-		private ArrayList<SentryEventRequest> unsentRequests;
+		private List<SentryEventRequest> unsentRequests;
 		
 		private static InternalStorage getInstance() {
 			return LazyHolder.instance;
@@ -567,8 +568,12 @@ public class Sentry {
 		/**
 		 * @return the unsentRequests
 		 */
-		public ArrayList<SentryEventRequest> getUnsentRequests() {
-			return unsentRequests;
+		public List<SentryEventRequest> getUnsentRequests() {
+			final List<SentryEventRequest> copy = new ArrayList<>();
+			synchronized (this) {
+				copy.addAll(unsentRequests);
+			}
+			return copy;
 		}
 
 		public void addRequest(SentryEventRequest request) {
@@ -589,7 +594,7 @@ public class Sentry {
 			}
 		}
 
-		private void writeObject(Context context, ArrayList<SentryEventRequest> requests) {
+		private void writeObject(Context context, List<SentryEventRequest> requests) {
 			try {
 				FileOutputStream fos = context.openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
 				ObjectOutputStream oos = new ObjectOutputStream(fos);
@@ -603,11 +608,11 @@ public class Sentry {
 			}
 		}
 
-		private ArrayList<SentryEventRequest> readObject(Context context) {
+		private List<SentryEventRequest> readObject(Context context) {
 			try {
 				FileInputStream fis = context.openFileInput(FILE_NAME);
 				ObjectInputStream ois = new ObjectInputStream(fis);
-				ArrayList<SentryEventRequest> requests = (ArrayList<SentryEventRequest>) ois.readObject();
+				List<SentryEventRequest> requests = (ArrayList<SentryEventRequest>) ois.readObject();
 				ois.close();
 				fis.close();
 				return requests;
