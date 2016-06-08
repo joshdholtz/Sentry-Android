@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.4.1** | Fixes for a potential memory leak and a crash (thanks to [Syhids](https://github.com/Syhids) and [woostrowski](https://github.com/woostrowski))
 **1.4.0** | Fixes issues when using self-hosted Sentry server
 **1.2.1** | Sends up data to Sentry as UTF-8
 **1.2.0** | Added support for Android version 23 and made library avaiable to install via gradle
