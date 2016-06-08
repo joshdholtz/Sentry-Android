@@ -114,13 +114,16 @@ public class Sentry {
 		Sentry.getInstance().context = context;
 
 		Uri uri = Uri.parse(dsn);
+		String port = "";
+		if (uri.getPort() >= 0) {
+			port = ":" + uri.getPort();
+		}
 
-		Sentry.getInstance().baseUrl = uri.getScheme() + "://" + uri.getHost();
+		Sentry.getInstance().baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 
-		
 		Sentry.getInstance().setupUncaughtExceptionHandler();
 	}
 	
