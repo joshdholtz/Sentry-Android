@@ -110,7 +110,7 @@ public class Sentry {
 	}
 
 	public static void init(Context context, String dsn) {
-		Sentry.getInstance().context = context;
+		Sentry.getInstance().context = context.getApplicationContext();
 
 		Uri uri = Uri.parse(dsn);
 
