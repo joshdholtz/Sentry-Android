@@ -47,7 +47,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.4.0'
+compile 'com.joshdholtz.sentry:sentry-android:1.4.1'
 ```
 
 ### Manual
