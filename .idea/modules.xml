@@ -4,6 +4,8 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Sentry-Android.iml" filepath="$PROJECT_DIR$/Sentry-Android.iml" />
       <module fileurl="file://$PROJECT_DIR$/sentry-android/sentry-android.iml" filepath="$PROJECT_DIR$/sentry-android/sentry-android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sentry-android-okhttp-client/sentry-android-okhttp-client.iml" filepath="$PROJECT_DIR$/sentry-android-okhttp-client/sentry-android-okhttp-client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sentry-apache-http-client/sentry-apache-http-client.iml" filepath="$PROJECT_DIR$/sentry-apache-http-client/sentry-apache-http-client.iml" />
       <module fileurl="file://$PROJECT_DIR$/sentry-app/sentry-app.iml" filepath="$PROJECT_DIR$/sentry-app/sentry-app.iml" />
     </modules>
   </component>

@@ -5,7 +5,7 @@ android {
     buildToolsVersion "23.0.3"
 
     defaultConfig {
-        minSdkVersion 3
+        minSdkVersion 10
         targetSdkVersion 23
         versionCode 1
         versionName "1.0"
@@ -18,15 +18,15 @@ android {
     }
 }
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
+ext {
+    libraryName = 'sentry-android-okhttp-client'
+    artifact = 'sentry-android-okhttp-client'
+    libraryDescription = 'A Sentry okhttp client for Android'
 }
 
-ext {
-    libraryName = 'sentry-android'
-    artifact = 'sentry-android'
-
-    libraryDescription = 'A Sentry client for Android'
+dependencies {
+    compile "com.squareup.okhttp3:okhttp:3.3.1"
+    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
 }
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'

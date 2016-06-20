@@ -4,6 +4,8 @@ android {
     compileSdkVersion 23
     buildToolsVersion "23.0.3"
 
+    useLibrary 'org.apache.http.legacy'
+
     defaultConfig {
         minSdkVersion 3
         targetSdkVersion 23
@@ -18,16 +20,13 @@ android {
     }
 }
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-}
-
 ext {
-    libraryName = 'sentry-android'
-    artifact = 'sentry-android'
-
-    libraryDescription = 'A Sentry client for Android'
+    libraryName = 'sentry-android-apache-http-client'
+    artifact = 'sentry-android-apache-http-client'
+    libraryDescription = 'A Sentry Apache http client for Android'
 }
 
-apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
-apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
+dependencies {
+    provided 'org.jbundle.util.osgi.wrapped:org.jbundle.util.osgi.wrapped.org.apache.http.client:4.1.2'
+    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+}

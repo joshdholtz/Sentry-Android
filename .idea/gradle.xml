@@ -10,6 +10,8 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/sentry-android" />
+            <option value="$PROJECT_DIR$/sentry-android-okhttp-client" />
+            <option value="$PROJECT_DIR$/sentry-apache-http-client" />
             <option value="$PROJECT_DIR$/sentry-app" />
           </set>
         </option>
@@ -17,6 +19,8 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/sentry-android" />
+            <option value="$PROJECT_DIR$/sentry-android-okhttp-client" />
+            <option value="$PROJECT_DIR$/sentry-apache-http-client" />
             <option value="$PROJECT_DIR$/sentry-app" />
           </set>
         </option>
