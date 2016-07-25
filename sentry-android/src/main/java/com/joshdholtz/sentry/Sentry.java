@@ -88,6 +88,7 @@ public class Sentry {
 	private Context context;
 
 	public static String sentryVersion = "7";
+	public static boolean debug = false;
 
 	private String baseUrl;
 	private String dsn;
@@ -100,6 +101,12 @@ public class Sentry {
 
 	private Sentry() {
 
+	}
+
+	private static void log(String text) {
+		if (debug) {
+			log(text);
+		}
 	}
 
 	private static Sentry getInstance() {
@@ -157,7 +164,7 @@ public class Sentry {
 		
 		UncaughtExceptionHandler currentHandler = Thread.getDefaultUncaughtExceptionHandler();
 		if (currentHandler != null) {
-			Log.d("Debugged", "current handler class="+currentHandler.getClass().getName());
+			log("current handler class=" + currentHandler.getClass().getName());
 		}
 		
 		// don't register again if already registered
@@ -200,7 +207,7 @@ public class Sentry {
 
 	public static void sendAllCachedCapturedEvents() {
 		List<SentryEventRequest> unsentRequests = InternalStorage.getInstance().getUnsentRequests();
-		Log.d(Sentry.TAG, "Sending up " + unsentRequests.size() + " cached response(s)");
+		log("Sending up " + unsentRequests.size() + " cached response(s)");
 		for (SentryEventRequest request : unsentRequests) {
 			Sentry.doCaptureEventPost(request);
 		}
@@ -250,7 +257,7 @@ public class Sentry {
 
 			// Embed version in stacktrace filename
 			File stacktrace = new File(getStacktraceLocation(context), "raven-" +  String.valueOf(random) + ".stacktrace");
-			Log.d(TAG, "Writing unhandled exception to: " + stacktrace.getAbsolutePath());
+			log("Writing unhandled exception to: " + stacktrace.getAbsolutePath());
 
 			// Write the stacktrace to disk
 			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(stacktrace));
@@ -263,7 +270,7 @@ public class Sentry {
 			ebos.printStackTrace();
 		}
 
-		Log.d(TAG, result.toString());
+		log(result.toString());
 	}
 
 	private static String getCause(Throwable t, String culprit) {
@@ -303,7 +310,7 @@ public class Sentry {
 			request = new SentryEventRequest(builder);
 		}
 
-		Log.d(TAG, "Request - " + request.getRequestData());
+		log("Request - " + request.getRequestData());
 
 		// Check if on main thread - if not, run on main thread
 		if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -419,15 +426,15 @@ public class Sentry {
 				int projectId = Integer.parseInt(getProjectId());
 				String url = Sentry.getInstance().baseUrl + "/api/" + projectId + "/store/";
 
-				Log.d(TAG, "Sending to URL - " + url);
+				log("Sending to URL - " + url);
 
 				HttpClient httpClient;
 				if(Sentry.getInstance().verifySsl != 0) {
-					Log.d(TAG, "Using http client");
+					log("Using http client");
 					httpClient = new DefaultHttpClient();
 				}
 				else {
-					Log.d(TAG, "Using https client");
+					log("Using https client");
 					httpClient = getHttpsClient(new DefaultHttpClient());
 				}
 
@@ -477,7 +484,7 @@ public class Sentry {
 
 					success = (status == 200);
 
-					Log.d(TAG, "SendEvent - " + status + " " + stringResponse);
+					log("SendEvent - " + status + " " + stringResponse);
 				} catch (ClientProtocolException e) {
 					e.printStackTrace();
 				} catch (IOException e) {
@@ -587,7 +594,7 @@ public class Sentry {
 
 		public void addRequest(SentryEventRequest request) {
 			synchronized(this) {
-				Log.d(Sentry.TAG, "Adding request - " + request.uuid);
+				log("Adding request - " + request.uuid);
 				if (!this.unsentRequests.contains(request)) {
 					this.unsentRequests.add(request);
 					this.writeObject(Sentry.getInstance().context, this.unsentRequests);
@@ -597,7 +604,7 @@ public class Sentry {
 		
 		public void removeBuilder(SentryEventRequest request) {
 			synchronized(this) {
-				Log.d(Sentry.TAG, "Removing request - " + request.uuid);
+				log("Removing request - " + request.uuid);
 				this.unsentRequests.remove(request);
 				this.writeObject(Sentry.getInstance().context, this.unsentRequests);
 			}
