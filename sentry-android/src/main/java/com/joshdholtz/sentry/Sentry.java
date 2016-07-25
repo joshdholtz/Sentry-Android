@@ -111,6 +111,10 @@ public class Sentry {
 	}
 
 	public static void init(Context context, String dsn) {
+		init(context, dsn, true);
+	}
+
+	public static void init(Context context, String dsn, boolean setupUncaughtExceptionHandler) {
 		Sentry.getInstance().context = context.getApplicationContext();
 
 		Uri uri = Uri.parse(dsn);
@@ -124,7 +128,9 @@ public class Sentry {
 		Sentry.getInstance().packageName = context.getPackageName();
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 
-		Sentry.getInstance().setupUncaughtExceptionHandler();
+		if (setupUncaughtExceptionHandler) {
+			Sentry.getInstance().setupUncaughtExceptionHandler();
+		}
 	}
 	
 	private static int getVerifySsl(String dsn) {
