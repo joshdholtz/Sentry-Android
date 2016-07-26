@@ -105,7 +105,7 @@ public class Sentry {
 
 	private static void log(String text) {
 		if (debug) {
-			log(text);
+			Log.d(TAG, text);
 		}
 	}
 
