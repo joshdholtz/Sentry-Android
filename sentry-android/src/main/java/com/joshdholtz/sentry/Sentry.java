@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -41,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -71,15 +69,21 @@ import org.json.JSONObject;
 import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.WindowManager;
 
 public class Sentry {
 
@@ -94,6 +98,7 @@ public class Sentry {
 	private String packageName;
 	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
+	private Map<String, Object> contexts;
 
 	private static final String TAG = "Sentry";
 	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
@@ -127,6 +132,7 @@ public class Sentry {
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
+		Sentry.getInstance().contexts = ReadContexts(Sentry.getInstance().context);
 
 		if (setupUncaughtExceptionHandler) {
 			Sentry.getInstance().setupUncaughtExceptionHandler();
@@ -290,6 +296,7 @@ public class Sentry {
 
 	public static void captureEvent(SentryEventBuilder builder) {
 		final SentryEventRequest request;
+		builder.event.put("contexts", Sentry.getInstance().contexts);
 		if (Sentry.getInstance().captureListener != null) {
 			
 			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
@@ -965,4 +972,104 @@ public class Sentry {
         }
     }
 
+	private static Map<String, Object> ReadContexts(Context context) {
+		final Map<String, Object> contexts = new HashMap<>();
+		contexts.put("os", OsContext());
+		contexts.put("device", DeviceContext(context));
+		contexts.put("package", PackageContext(context));
+		return contexts;
+	}
+
+	/**
+	 * Read the device and build into a map.
+	 *
+	 * Not implemented:
+	 *   -  battery_level
+	 *   If the device has a battery this can be an integer defining the battery level (in
+	 *   the range 0-100). (Android requires registration of an intent to query the battery).
+	 *   - name
+	 *   The name of the device. This is typically a hostname.
+	 *
+	 *   @see https://docs.getsentry.com/hosted/clientdev/interfaces/#context-types
+     */
+	private static Map<String, String> DeviceContext(Context context) {
+		final Map<String, String> device = new HashMap<>();
+		try {
+			// The family of the device. This is normally the common part of model names across
+			// generations. For instance iPhone would be a reasonable family, so would be Samsung Galaxy.
+			device.put("family", Build.BRAND);
+
+			// The model name. This for instance can be Samsung Galaxy S3.
+			device.put("model", Build.PRODUCT);
+
+			// An internal hardware revision to identify the device exactly.
+			device.put("model_id", Build.MODEL);
+
+			final String architecture = System.getProperty("os.arch");
+			if (architecture != null) {
+				device.put("arch", architecture);
+			}
+
+			final int orient = context.getResources().getConfiguration().orientation;
+			device.put("orientation", orient == Configuration.ORIENTATION_LANDSCAPE ?
+					"landscape" : "portrait");
+
+			// Read screen resolution in the format "800x600"
+			// Normalised to have wider side first.
+			final Object windowManager = context.getSystemService(Context.WINDOW_SERVICE);
+			if (windowManager != null && windowManager instanceof WindowManager) {
+				final DisplayMetrics metrics = new DisplayMetrics();
+				((WindowManager) windowManager).getDefaultDisplay().getMetrics(metrics);
+				device.put("screen_resolution",
+						String.format("%sx%s",
+								Math.max(metrics.widthPixels, metrics.heightPixels),
+								Math.min(metrics.widthPixels, metrics.heightPixels)));
+			}
+
+		} catch (Exception e) {
+			Log.e(TAG, "Error reading device context", e);
+		}
+		return device;
+	}
+
+	private static Map<String, String> OsContext() {
+		final Map<String, String> os = new HashMap<>();
+		try {
+			os.put("type", "os");
+			os.put("name", "Android");
+			os.put("version", Build.VERSION.RELEASE);
+			if (Build.VERSION.SDK_INT < 4) {
+				os.put("build", Build.VERSION.SDK);
+			} else {
+				os.put("build", Integer.toString(Build.VERSION.SDK_INT));
+			}
+			final String kernelVersion = System.getProperty("os.version");
+			if (kernelVersion != null) {
+				os.put("kernel_version", kernelVersion);
+			}
+
+		} catch (Exception e) {
+			Log.e(TAG, "Error reading OS context", e);
+		}
+		return os;
+	}
+
+	/**
+	 * Read the package data into map to be sent as an event context item.
+	 * This is not a built-in context type.
+     */
+	private static Map<String, String> PackageContext(Context context) {
+		final Map<String, String> pack = new HashMap<>();
+		try {
+			final String packageName = context.getPackageName();
+			final PackageInfo packageInfo = context.getPackageManager().getPackageInfo(packageName, 0);
+			pack.put("type", "package");
+			pack.put("name", packageName);
+			pack.put("version_name", packageInfo.versionName);
+			pack.put("version_code", Integer.toString(packageInfo.versionCode));
+		} catch (Exception e) {
+			Log.e(TAG, "Error reading package context", e);
+		}
+		return pack;
+	}
 }
