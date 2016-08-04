@@ -31,6 +31,8 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.4.4** | Sends up device, app, and OS context by default (thanks to [marcomorain](https://github.com/marcomorain))
+**1.4.3** | Fixes for a Google Play warning and added option to not use crash reporting (thanks to [ZeroStride](https://github.com/ZeroStride))
 **1.4.1** | Fixes for a potential memory leak and a crash (thanks to [Syhids](https://github.com/Syhids) and [woostrowski](https://github.com/woostrowski))
 **1.4.0** | Fixes issues when using self-hosted Sentry server
 **1.2.1** | Sends up data to Sentry as UTF-8
@@ -48,7 +50,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.4.1'
+compile 'com.joshdholtz.sentry:sentry-android:1.4.4'
 ```
 
 ### Manual
