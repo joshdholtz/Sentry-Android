@@ -132,7 +132,7 @@ public class Sentry {
 		Sentry.getInstance().dsn = dsn;
 		Sentry.getInstance().packageName = context.getPackageName();
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
-		Sentry.getInstance().contexts = ReadContexts(Sentry.getInstance().context);
+		Sentry.getInstance().contexts = readContexts(Sentry.getInstance().context);
 
 		if (setupUncaughtExceptionHandler) {
 			Sentry.getInstance().setupUncaughtExceptionHandler();
@@ -972,11 +972,11 @@ public class Sentry {
         }
     }
 
-	private static Map<String, Object> ReadContexts(Context context) {
+	private static Map<String, Object> readContexts(Context context) {
 		final Map<String, Object> contexts = new HashMap<>();
-		contexts.put("os", OsContext());
-		contexts.put("device", DeviceContext(context));
-		contexts.put("package", PackageContext(context));
+		contexts.put("os", osContext());
+		contexts.put("device", deviceContext(context));
+		contexts.put("package", packageContext(context));
 		return contexts;
 	}
 
@@ -992,7 +992,7 @@ public class Sentry {
 	 *
 	 *   @see https://docs.getsentry.com/hosted/clientdev/interfaces/#context-types
      */
-	private static Map<String, String> DeviceContext(Context context) {
+	private static Map<String, String> deviceContext(Context context) {
 		final Map<String, String> device = new HashMap<>();
 		try {
 			// The family of the device. This is normally the common part of model names across
@@ -1032,7 +1032,7 @@ public class Sentry {
 		return device;
 	}
 
-	private static Map<String, String> OsContext() {
+	private static Map<String, String> osContext() {
 		final Map<String, String> os = new HashMap<>();
 		try {
 			os.put("type", "os");
@@ -1058,7 +1058,7 @@ public class Sentry {
 	 * Read the package data into map to be sent as an event context item.
 	 * This is not a built-in context type.
      */
-	private static Map<String, String> PackageContext(Context context) {
+	private static Map<String, String> packageContext(Context context) {
 		final Map<String, String> pack = new HashMap<>();
 		try {
 			final String packageName = context.getPackageName();
