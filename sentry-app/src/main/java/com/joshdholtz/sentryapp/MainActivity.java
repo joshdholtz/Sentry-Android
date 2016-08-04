@@ -17,6 +17,7 @@ public class MainActivity extends AppCompatActivity {
 
         String yourDSN = "your-dsn";
         Sentry.init(this, yourDSN);
+        Sentry.debug = true;
         Sentry.captureMessage("OMG this works woooo");
     }
 

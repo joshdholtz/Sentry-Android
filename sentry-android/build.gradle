@@ -38,7 +38,7 @@ ext {
     siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
     gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
 
-    libraryVersion = '1.4.1'
+    libraryVersion = '1.4.3'
 
     developerId = 'joshdholtz'
     developerName = 'Josh Holtz'
