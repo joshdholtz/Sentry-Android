@@ -3,7 +3,6 @@ package com.joshdholtz.sentry;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,14 +10,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
-import java.io.StreamCorruptedException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -47,7 +44,6 @@ import javax.net.ssl.X509TrustManager;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -57,7 +53,6 @@ import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.params.HttpProtocolParams;
@@ -72,7 +67,6 @@ import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -91,7 +85,7 @@ public class Sentry {
 
 	private Context context;
 
-	public static String sentryVersion = "7";
+	public final static String sentryVersion = "7";
 	public static boolean debug = false;
 
 	private String baseUrl;
@@ -119,7 +113,7 @@ public class Sentry {
 	}
 
 	private static class LazyHolder {
-		private static Sentry instance = new Sentry();
+		private static final Sentry instance = new Sentry();
 	}
 
 	public static void init(Context context, String dsn) {
@@ -177,7 +171,7 @@ public class Sentry {
 		if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
 			// Register default exceptions handler
 			Thread.setDefaultUncaughtExceptionHandler(
-					new SentryUncaughtExceptionHandler(currentHandler, context));
+					new SentryUncaughtExceptionHandler(currentHandler));
 		}
 		
 		sendAllCachedCapturedEvents();
@@ -377,7 +371,7 @@ public class Sentry {
 		    }
 
 		    @Override
-		    public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException, UnknownHostException {
+		    public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
 		        return sslContext.getSocketFactory().createSocket(socket, host, port, autoClose);
 		    }
 
@@ -492,10 +486,6 @@ public class Sentry {
 					success = (status == 200);
 
 					log("SendEvent - " + status + " " + stringResponse);
-				} catch (ClientProtocolException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -533,13 +523,11 @@ public class Sentry {
 
 	private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
-		private UncaughtExceptionHandler defaultExceptionHandler;
-		private Context context;
+		private final UncaughtExceptionHandler defaultExceptionHandler;
 
 		// constructor
-		public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, Context context) {
+		public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler) {
 			defaultExceptionHandler = pDefaultExceptionHandler;
-			this.context = context;
 		}
 
 		@Override
@@ -565,14 +553,14 @@ public class Sentry {
 	private static class InternalStorage {
 
 		private final static String FILE_NAME = "unsent_requests";
-		private List<SentryEventRequest> unsentRequests;
+		private final List<SentryEventRequest> unsentRequests;
 		
 		private static InternalStorage getInstance() {
 			return LazyHolder.instance;
 		}
 
 		private static class LazyHolder {
-			private static InternalStorage instance = new InternalStorage();
+			private static final InternalStorage instance = new InternalStorage();
 		}
 		
 		private InternalStorage() {
@@ -624,8 +612,6 @@ public class Sentry {
 				oos.writeObject(requests);
 				oos.close();
 				fos.close();
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -639,16 +625,10 @@ public class Sentry {
 				ois.close();
 				fis.close();
 				return requests;
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-			} catch (StreamCorruptedException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
+			} catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}
-			return new ArrayList<SentryEventRequest>();
+			return new ArrayList<>();
 		}
 	}
 
@@ -659,8 +639,8 @@ public class Sentry {
 	}
 	
 	public static class SentryEventRequest implements Serializable {
-		private String requestData;
-		private UUID uuid;
+		private final String requestData;
+		private final UUID uuid;
 		
 		public SentryEventRequest(SentryEventBuilder builder) {
 			this.requestData = new JSONObject(builder.event).toString();
@@ -703,7 +683,7 @@ public class Sentry {
 			sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 		}
 
-		private Map<String, Object> event;
+		private final Map<String, Object> event;
 
 		public static enum SentryEventLevel {
 
@@ -713,15 +693,14 @@ public class Sentry {
 			INFO("info"),
 			DEBUG("debug");
 
-			private String value;
+			private final String value;
 			SentryEventLevel(String value) {
 				this.value = value;
 			}
-
 		}
 
 		public SentryEventBuilder() {
-			event = new HashMap<String, Object>();
+			event = new HashMap<>();
 			event.put("event_id", UUID.randomUUID().toString().replace("-", ""));
 			event.put("platform", "java");
 			this.setTimestamp(System.currentTimeMillis());
