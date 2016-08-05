@@ -652,9 +652,9 @@ public class Sentry {
 		}
 	}
 
-	public abstract static class SentryEventCaptureListener {
+	public interface SentryEventCaptureListener {
 
-		public abstract SentryEventBuilder beforeCapture(SentryEventBuilder builder);
+		SentryEventBuilder beforeCapture(SentryEventBuilder builder);
 
 	}
 	
