@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -697,6 +698,14 @@ public class Sentry {
 	public static class SentryEventBuilder implements Serializable {
 
 		private static final long serialVersionUID = -8589756678369463988L;
+
+		// Match packages names that start with some well-known internal class-paths:
+		// java.*
+		// android.*
+		// com.android.*
+		// com.google.android.*
+		// dalvik.system.*
+		static final String isInternalPackage = "^(java|android|com\\.android|com\\.google\\.android|dalvik\\.system)\\..*";
 		
 		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		static {
@@ -941,41 +950,41 @@ public class Sentry {
             JSONArray frameList = new JSONArray();
 
             for (StackTraceElement ste : t.getStackTrace()) {
-                JSONObject frame = new JSONObject();
-
-                String method = ste.getMethodName();
-                if (method.length() != 0) {
-                    frame.put("function", method);
-                }
-
-                int lineno = ste.getLineNumber();
-                if (!ste.isNativeMethod() && lineno >= 0) {
-                    frame.put("lineno", lineno);
-                }
-
-                boolean inApp = true;
-
-                String className = ste.getClassName();
-                frame.put("module", className);
-
-                // Take out some of the system packages to improve the exception folding on the sentry server
-                if (className.startsWith("android.")
-                        || className.startsWith("java.")
-                        || className.startsWith("dalvik.")
-                        || className.startsWith("com.android.")) {
-
-                    inApp = false;
-                        }
-
-                frame.put("in_app", inApp);
-
-                frameList.put(frame);
+                frameList.put(frameJson(ste));
             }
 
             JSONObject frameHash = new JSONObject();
             frameHash.put("frames", frameList);
 
             return frameHash;
+        }
+
+        // Convert a StackTraceElement to a sentry.interfaces.stacktrace.Stacktrace JSON object.
+        static JSONObject frameJson(StackTraceElement ste) throws JSONException {
+            final JSONObject frame = new JSONObject();
+
+            final String method = ste.getMethodName();
+            if (method.length() != 0) {
+                frame.put("function", method);
+            }
+
+            final String fileName = ste.getFileName();
+            if (fileName.length() > 0) {
+                frame.put("filename", fileName);
+            }
+
+            int lineno = ste.getLineNumber();
+            if (!ste.isNativeMethod() && lineno >= 0) {
+                frame.put("lineno", lineno);
+            }
+
+            String className = ste.getClassName();
+            frame.put("module", className);
+
+            // Take out some of the system packages to improve the exception folding on the sentry server
+            frame.put("in_app", !className.matches(isInternalPackage));
+
+            return frame;
         }
     }
 
