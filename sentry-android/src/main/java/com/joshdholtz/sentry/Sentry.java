@@ -8,6 +8,7 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Pair;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -51,6 +52,7 @@ public final class Sentry {
     private String sentryVersion = "7";
     private String url;
     private Uri dsn;
+    private Pair<String,String> credentials;
     private String packageName;
     private int verifySsl;
     private SentryEventCaptureListener captureListener;
@@ -70,10 +72,11 @@ public final class Sentry {
     private boolean enableDebugLogging;
     private SentryUncaughtExceptionHandler uncaughtExceptionHandler;
 
-    private Sentry(Context applicationContext, Uri dsnUri, String url, int verifySsl, String storageFileName, HttpRequestSender httpRequestSender) {
+    private Sentry(Context applicationContext, Uri dsnUri, String url, Pair<String, String> credentials, int verifySsl, String storageFileName, HttpRequestSender httpRequestSender) {
         context = applicationContext;
         dsn = dsnUri;
         this.url = url;
+        this.credentials = credentials;
         this.verifySsl = verifySsl;
         this.httpRequestSender = httpRequestSender;
         packageName = applicationContext.getPackageName();
@@ -84,15 +87,16 @@ public final class Sentry {
      * This method returns new {@code Sentry} instance which can operate separately with other instances. Should be called once, usually in {@link Application#onCreate()} and obtained from some singleton. If you have only one instance than you can use {@link SentryInstance}. In {@link android.app.Activity#onCreate(Bundle)} you should call at least {@link #sendAllCachedCapturedEvents()} to try to send cached events
      *
      * @param context           this can be any context because {@link Context#getApplicationContext()} is used to avoid memory leak
-     * @param dsn               DSN of your project
+     * @param dsnWithoutCredentials               DSN of your project - remove credentials from it to avoid warning in Google Play console
      * @param httpRequestSender used for sending events to Sentry server
      * @param storageFileName   unsent requests storage file - must be different for different instances
+     * @param credentials  credentials from DSN
      * @return new {@code Sentry} instance
      */
-    public static Sentry newInstance(Context context, String dsn, HttpRequestSender httpRequestSender, String storageFileName) {
-        Uri dsnUri = Uri.parse(dsn);
+    public static Sentry newInstance(Context context, String dsnWithoutCredentials, HttpRequestSender httpRequestSender, String storageFileName, Pair<String, String> credentials) {
+        Uri dsnUri = Uri.parse(dsnWithoutCredentials);
 
-        Sentry sentry = new Sentry(context.getApplicationContext(), dsnUri, getUrl(dsnUri), getVerifySsl(dsnUri), storageFileName, httpRequestSender);
+        Sentry sentry = new Sentry(context.getApplicationContext(), dsnUri, getUrl(dsnUri), credentials, getVerifySsl(dsnUri), storageFileName, httpRequestSender);
         sentry.setupUncaughtExceptionHandler();
         return sentry;
     }
@@ -143,20 +147,18 @@ public final class Sentry {
     private String createXSentryAuthHeader() {
         String header = "";
 
-        String authority = dsn.getAuthority().replace("@" + dsn.getHost(), "");
-
-        String[] authorityParts = authority.split(":");
-        String publicKey = authorityParts[0];
-        String secretKey = authorityParts[1];
+        String publicKey = credentials.first;
+        String secretKey = credentials.second;
 
         header += "Sentry sentry_version=" + sentryVersion + ",";
         header += "sentry_client=sentry-android/" + VERSION + ",";
         header += "sentry_timestamp=" + System.currentTimeMillis() + ",";
-        header += "sentry_key=" + publicKey + ",";
+        header += "sentry_key=" + publicKey+",";
         header += "sentry_secret=" + secretKey;
 
         return header;
     }
+
 
     public void sendAllCachedCapturedEvents() {
         if (shouldAttemptPost()) {

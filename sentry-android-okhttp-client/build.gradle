@@ -1,4 +1,8 @@
+group = 'com.joshdholtz.sentry'
+version = '1.4.2-finanteq'
 apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+
 
 android {
     compileSdkVersion 23
@@ -25,9 +29,23 @@ ext {
 }
 
 dependencies {
-    compile "com.squareup.okhttp3:okhttp:3.3.1"
+    compile "com.squareup.okhttp3:okhttp:3.4.1"
+//    compile project(":sentry-android")
     compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
 }
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: nexusReleaseRepository) {
+                authentication(userName: nexusUserName, password: nexusPassword)
+            }
+            snapshotRepository(url: nexusSnapshotRepository) {
+                authentication(userName: nexusUserName, password: nexusPassword)
+            }
+        }
+    }
+}
