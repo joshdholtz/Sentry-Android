@@ -34,6 +34,7 @@ import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -99,7 +100,7 @@ public class Sentry {
 	private String packageName;
 	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
-	private Map<String, Object> contexts;
+	private Map<String, Object> contexts = Collections.emptyMap();
 
 	private static final String TAG = "Sentry";
 	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
@@ -551,6 +552,7 @@ public class Sentry {
 			}
 
             if (builder != null) {
+                builder.event.put("contexts", Sentry.getInstance().contexts);
                 InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
             } else {
                 Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
