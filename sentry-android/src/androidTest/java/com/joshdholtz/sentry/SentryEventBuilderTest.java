@@ -9,9 +9,51 @@ import junit.framework.TestCase;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 public class SentryEventBuilderTest extends TestCase {
+
+    // Tests the adding an extra with a helper method
+    public void testAddExtra() throws JSONException {
+        Map<String, String> initialExtra = new HashMap<String, String>();
+        initialExtra.put("key1", "value1");
+        initialExtra.put("key2", "value2");
+
+        Sentry.SentryEventBuilder builder = new Sentry.SentryEventBuilder()
+                .setMessage("Being awesome")
+                .setExtra(initialExtra);
+
+        JSONObject extra = builder.getExtra();
+        assertEquals("value1", extra.getString("key1"));
+        assertEquals("value2", extra.getString("key2"));
+
+        builder.addExtra("key3", "value3");
+
+        JSONObject moreExtra = builder.getExtra();
+        assertEquals("value3", moreExtra.getString("key3"));
+    }
+
+    // Tests the adding a tag with a helper method
+    public void testAddTag() throws JSONException {
+        Map<String, String> initialTags = new HashMap<String, String>();
+        initialTags.put("tag1", "value1");
+        initialTags.put("tag2", "value2");
+
+        Sentry.SentryEventBuilder builder = new Sentry.SentryEventBuilder()
+                .setMessage("Being awesome")
+                .setTags(initialTags);
+
+        JSONObject tags = builder.getTags();
+        assertEquals("value1", tags.getString("key1"));
+        assertEquals("value2", tags.getString("key2"));
+
+        builder.addTag("key3", "value3");
+
+        JSONObject moreTags = builder.getExtra();
+        assertEquals("value3", moreTags.getString("key3"));
+    }
 
     // Since regexes are very hard to read, we build the regex to recognize an internal package
     // name programatically.

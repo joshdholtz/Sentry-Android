@@ -696,6 +696,10 @@ public class Sentry {
 
 		private final Map<String, Object> event;
 
+		public JSONObject toJSON() {
+			return new JSONObject(event);
+		}
+
 		public static enum SentryEventLevel {
 
 			FATAL("fatal"),
@@ -816,6 +820,16 @@ public class Sentry {
 			return this;
 		}
 
+		public SentryEventBuilder addTag(String key, String value) {
+			try {
+				getTags().put(key, value);
+			} catch (JSONException e) {
+				Log.e(Sentry.TAG, "Error adding tag in SentryEventBuilder");
+			}
+
+			return this;
+		}
+
 		public JSONObject getTags() {
 			if (!event.containsKey("tags")) {
 				setTags(new HashMap<String, String>());
@@ -879,6 +893,16 @@ public class Sentry {
 
 		public SentryEventBuilder setExtra(JSONObject extra) {
 			event.put("extra", extra);
+			return this;
+		}
+
+		public SentryEventBuilder addExtra(String key, String value) {
+			try {
+				getExtra().put(key, value);
+			} catch (JSONException e) {
+				Log.e(Sentry.TAG, "Error adding extra in SentryEventBuilder");
+			}
+
 			return this;
 		}
 
