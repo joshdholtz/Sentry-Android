@@ -95,7 +95,7 @@ public class Sentry {
 	private String packageName;
 	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
-	private Map<String, Object> contexts = Collections.emptyMap();
+	private JSONObject contexts = new JSONObject();
 
 	private static final String TAG = "Sentry";
 	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
@@ -969,11 +969,15 @@ public class Sentry {
         }
     }
 
-	private static Map<String, Object> readContexts(Context context) {
-		final Map<String, Object> contexts = new HashMap<>();
-		contexts.put("os", osContext());
-		contexts.put("device", deviceContext(context));
-		contexts.put("package", packageContext(context));
+	private static JSONObject readContexts(Context context) {
+		final JSONObject contexts = new JSONObject();
+		try {
+			contexts.put("os", osContext());
+			contexts.put("device", deviceContext(context));
+			contexts.put("package", packageContext(context));
+		} catch (JSONException e) {
+			Log.e(TAG, "Failed to build device contexts", e);
+		}
 		return contexts;
 	}
 
@@ -989,8 +993,8 @@ public class Sentry {
 	 *
 	 *   @see https://docs.getsentry.com/hosted/clientdev/interfaces/#context-types
      */
-	private static Map<String, String> deviceContext(Context context) {
-		final Map<String, String> device = new HashMap<>();
+	private static JSONObject deviceContext(Context context) {
+		final JSONObject device = new JSONObject();
 		try {
 			// The family of the device. This is normally the common part of model names across
 			// generations. For instance iPhone would be a reasonable family, so would be Samsung Galaxy.
@@ -1029,8 +1033,8 @@ public class Sentry {
 		return device;
 	}
 
-	private static Map<String, String> osContext() {
-		final Map<String, String> os = new HashMap<>();
+	private static JSONObject osContext() {
+		final JSONObject os = new JSONObject();
 		try {
 			os.put("type", "os");
 			os.put("name", "Android");
@@ -1055,8 +1059,8 @@ public class Sentry {
 	 * Read the package data into map to be sent as an event context item.
 	 * This is not a built-in context type.
      */
-	private static Map<String, String> packageContext(Context context) {
-		final Map<String, String> pack = new HashMap<>();
+	private static JSONObject packageContext(Context context) {
+		final JSONObject pack = new JSONObject();
 		try {
 			final String packageName = context.getPackageName();
 			final PackageInfo packageInfo = context.getPackageManager().getPackageInfo(packageName, 0);
