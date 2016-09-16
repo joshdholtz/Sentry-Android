@@ -33,6 +33,14 @@ public class MainActivity extends AppCompatActivity {
         s.length();
     }
 
+    public void onClickCapture(View view) {
+        try {
+            onClickBreak(view);
+        } catch (Exception e) {
+            Sentry.captureException(e, "Exception caught in click handler");
+        }
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
