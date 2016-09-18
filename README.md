@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		// Sentry will look for uncaught exceptions from previous runs and send them		
+		// Sentry will look for uncaught exceptions from previous runs and send them
 		Sentry.init(this.getApplicationContext(), "YOUR-SENTRY-DSN");
 
 	}
@@ -79,7 +79,7 @@ Sentry.captureMessage("Something significant may have happened");
 ``` java
 try {
 	JSONObject obj = new JSONObject();
-} catch (JSONException e) { 
+} catch (JSONException e) {
 	Sentry.captureException(e);
 }
 ```
@@ -93,16 +93,24 @@ Sentry.captureEvent(new Sentry.SentryEventBuilder()
 );
 ```
 
+
+### Release Tracking
+
+The SDK will automatically tag events with [a release](https://docs.sentry.io/hosted/api/releases/post-project-releases/).
+The release is set to the app's [`versionCode` by default](https://developer.android.com/studio/publish/versioning.html#appversioning).
+You can override the `release` easily by using the `setRelease(String release)`
+function from inside a `SentryEventCaptureListener`.
+
 ### Set a listener to intercept the SentryEventBuilder before each capture
 ``` java
 // CALL THIS BEFORE CALLING Sentry.init
-// Sets a listener to intercept the SentryEventBuilder before 
+// Sets a listener to intercept the SentryEventBuilder before
 // each capture to set values that could change state
 Sentry.setCaptureListener(new SentryEventCaptureListener() {
 
 	@Override
 	public SentryEventBuilder beforeCapture(SentryEventBuilder builder) {
-		
+
 		// Needs permission - <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 		ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 		NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
@@ -112,10 +120,10 @@ Sentry.setCaptureListener(new SentryEventCaptureListener() {
 			builder.getExtra().put("wifi", String.valueOf(mWifi.isConnected()));
 			builder.getTags().put("tag_1", "value_1");
 		} catch (JSONException e) {}
-		
+
 		return builder;
 	}
-	
+
 });
 
 ```

@@ -92,7 +92,7 @@ public class Sentry {
 
 	private String baseUrl;
 	private String dsn;
-	private String packageName;
+	private PackageInfo packageInfo;
 	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
 	private JSONObject contexts = new JSONObject();
@@ -131,9 +131,9 @@ public class Sentry {
 
 		Sentry.getInstance().baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
 		Sentry.getInstance().dsn = dsn;
-		Sentry.getInstance().packageName = context.getPackageName();
+		Sentry.getInstance().packageInfo = findPackage(Sentry.getInstance().context);
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
-		Sentry.getInstance().contexts = readContexts(Sentry.getInstance().context);
+		Sentry.getInstance().contexts = readContexts(Sentry.getInstance().context, Sentry.getInstance().packageInfo);
 
 		if (setupUncaughtExceptionHandler) {
 			Sentry.getInstance().setupUncaughtExceptionHandler();
@@ -278,10 +278,15 @@ public class Sentry {
 	}
 
 	private static String getCause(Throwable t, String culprit) {
+		final PackageInfo packageInfo = Sentry.getInstance().packageInfo;
+
+		if (packageInfo == null) {
+			return culprit;
+		}
+
 		for (StackTraceElement stackTrace : t.getStackTrace()) {
-			if (stackTrace.toString().contains(Sentry.getInstance().packageName)) {
-				culprit = stackTrace.toString();
-				break;
+			if (stackTrace.toString().contains(packageInfo.packageName)) {
+				return stackTrace.toString();
 			}
 		}
 
@@ -292,16 +297,13 @@ public class Sentry {
 		return new File(context.getCacheDir(), "crashes");
 	}
 
-	private static String getStackTrace(Throwable t) {
-		StringWriter sw = new StringWriter();
-		PrintWriter pw = new PrintWriter(sw);
-		t.printStackTrace(pw);
-		return sw.toString();
-	}
 
 	public static void captureEvent(SentryEventBuilder builder) {
 		final SentryEventRequest request;
 		builder.event.put("contexts", Sentry.getInstance().contexts);
+		if (Sentry.getInstance().packageInfo != null) {
+			builder.setRelease(Integer.toString(Sentry.getInstance().packageInfo.versionCode));
+		}
 		if (Sentry.getInstance().captureListener != null) {
 			
 			builder = Sentry.getInstance().captureListener.beforeCapture(builder);
@@ -538,6 +540,9 @@ public class Sentry {
 		public void uncaughtException(Thread thread, Throwable e) {
 			// Here you should have a more robust, permanent record of problems
 			SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventLevel.FATAL);
+			if (Sentry.getInstance().packageInfo != null) {
+				builder.setRelease(Integer.toString(Sentry.getInstance().packageInfo.versionCode));
+			}
 			if (Sentry.getInstance().captureListener != null) {
 				builder = Sentry.getInstance().captureListener.beforeCapture(builder);
 			}
@@ -995,12 +1000,12 @@ public class Sentry {
         }
     }
 
-	private static JSONObject readContexts(Context context) {
+	private static JSONObject readContexts(Context context, PackageInfo packageInfo) {
 		final JSONObject contexts = new JSONObject();
 		try {
 			contexts.put("os", osContext());
 			contexts.put("device", deviceContext(context));
-			contexts.put("package", packageContext(context));
+			contexts.put("package", packageContext(packageInfo));
 		} catch (JSONException e) {
 			Log.e(TAG, "Failed to build device contexts", e);
 		}
@@ -1017,7 +1022,7 @@ public class Sentry {
 	 *   - name
 	 *   The name of the device. This is typically a hostname.
 	 *
-	 *   @see https://docs.getsentry.com/hosted/clientdev/interfaces/#context-types
+	 *   See https://docs.getsentry.com/hosted/clientdev/interfaces/#context-types
      */
 	private static JSONObject deviceContext(Context context) {
 		final JSONObject device = new JSONObject();
@@ -1085,13 +1090,11 @@ public class Sentry {
 	 * Read the package data into map to be sent as an event context item.
 	 * This is not a built-in context type.
      */
-	private static JSONObject packageContext(Context context) {
+	private static JSONObject packageContext(PackageInfo packageInfo) {
 		final JSONObject pack = new JSONObject();
 		try {
-			final String packageName = context.getPackageName();
-			final PackageInfo packageInfo = context.getPackageManager().getPackageInfo(packageName, 0);
 			pack.put("type", "package");
-			pack.put("name", packageName);
+			pack.put("name", packageInfo.packageName);
 			pack.put("version_name", packageInfo.versionName);
 			pack.put("version_code", Integer.toString(packageInfo.versionCode));
 		} catch (Exception e) {
@@ -1100,11 +1103,19 @@ public class Sentry {
 		return pack;
 	}
 
-
 	/**
 	 * Take the idea of `present?` from ActiveSupport.
      */
 	private static boolean Present(String s) {
 		return s != null && s.length() > 0;
+	}
+
+	private static PackageInfo findPackage(Context context) {
+		try {
+			return  context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+		} catch (Exception e) {
+			Log.e(TAG, "Error reading package context", e);
+			return null;
+		}
 	}
 }
