@@ -969,12 +969,12 @@ public class Sentry {
             final JSONObject frame = new JSONObject();
 
             final String method = ste.getMethodName();
-            if (method.length() != 0) {
+            if (Present(method)) {
                 frame.put("function", method);
             }
 
             final String fileName = ste.getFileName();
-            if (fileName.length() > 0) {
+            if (Present(fileName)) {
                 frame.put("filename", fileName);
             }
 
@@ -1027,7 +1027,7 @@ public class Sentry {
 			device.put("model_id", Build.MODEL);
 
 			final String architecture = System.getProperty("os.arch");
-			if (architecture != null) {
+			if (Present(architecture)) {
 				device.put("arch", architecture);
 			}
 
@@ -1065,7 +1065,7 @@ public class Sentry {
 				os.put("build", Integer.toString(Build.VERSION.SDK_INT));
 			}
 			final String kernelVersion = System.getProperty("os.version");
-			if (kernelVersion != null) {
+			if (Present(kernelVersion)) {
 				os.put("kernel_version", kernelVersion);
 			}
 
@@ -1092,5 +1092,13 @@ public class Sentry {
 			Log.e(TAG, "Error reading package context", e);
 		}
 		return pack;
+	}
+
+
+	/**
+	 * Take the idea of `present?` from ActiveSupport.
+     */
+	private static boolean Present(String s) {
+		return s != null && s.length() > 0;
 	}
 }
