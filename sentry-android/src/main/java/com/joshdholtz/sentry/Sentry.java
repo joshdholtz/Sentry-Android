@@ -39,6 +39,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -72,11 +78,7 @@ import android.content.res.Configuration;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.WindowManager;
@@ -96,8 +98,10 @@ public class Sentry {
 	private int verifySsl;
 	private SentryEventCaptureListener captureListener;
 	private JSONObject contexts = new JSONObject();
+	private Executor executor;
 
 	private static final String TAG = "Sentry";
+	private static final int MAX_QUEUE_LENGTH = 50;
 
 	private Sentry() {
 	}
@@ -134,10 +138,30 @@ public class Sentry {
 		Sentry.getInstance().packageInfo = findPackage(Sentry.getInstance().context);
 		Sentry.getInstance().verifySsl = getVerifySsl(dsn);
 		Sentry.getInstance().contexts = readContexts(Sentry.getInstance().context, Sentry.getInstance().packageInfo);
+		Sentry.getInstance().executor = fixedQueueDiscardingExecutor(MAX_QUEUE_LENGTH);
 
 		if (setupUncaughtExceptionHandler) {
 			Sentry.getInstance().setupUncaughtExceptionHandler();
 		}
+	}
+
+	private static Executor fixedQueueDiscardingExecutor(int queueSize) {
+		// Name our threads so that it is easy for app developers to see who is creating threads.
+		final ThreadFactory threadFactory = new ThreadFactory() {
+			private final AtomicLong count = new AtomicLong();
+			@Override
+			public Thread newThread(Runnable runnable) {
+				final Thread thread = new Thread(runnable);
+				thread.setName(String.format(Locale.US, "Sentry HTTP Thread %d", count.incrementAndGet()));
+				return thread;
+			}
+		};
+
+		return new ThreadPoolExecutor(
+				0, 1, // Keep 0 threads alive. Max pool size is 1.
+				60, TimeUnit.SECONDS, // Kill unused threads after this length.
+				new ArrayBlockingQueue<Runnable>(queueSize),
+				threadFactory, new ThreadPoolExecutor.DiscardPolicy()); // Discard exceptions
 	}
 	
 	private static int getVerifySsl(String dsn) {
@@ -319,24 +343,7 @@ public class Sentry {
 
 		log("Request - " + request.getRequestData());
 
-		// Check if on main thread - if not, run on main thread
-		if (Looper.myLooper() == Looper.getMainLooper()) {
-			doCaptureEventPost(request);
-		} else if (Sentry.getInstance().context != null) {
-
-			HandlerThread thread = new HandlerThread("SentryThread") {};
-			thread.start();
-			Runnable runnable = new Runnable() {
-				@Override
-				public void run() {
-					doCaptureEventPost(request);
-				}
-			};
-			Handler h = new Handler(thread.getLooper());
-			h.post(runnable);
-
-		}
-
+		doCaptureEventPost(request);
 	}
 
 	private static boolean shouldAttemptPost() {
@@ -425,11 +432,10 @@ public class Sentry {
 			InternalStorage.getInstance().addRequest(request);
 			return;
 		}
-		
-		new AsyncTask<Void, Void, Void>(){
-			@Override
-			protected Void doInBackground(Void... params) {
 
+		getInstance().executor.execute(new Runnable() {
+			@Override
+			public void run() {
 				int projectId = Integer.parseInt(getProjectId());
 				String url = Sentry.getInstance().baseUrl + "/api/" + projectId + "/store/";
 
@@ -501,11 +507,9 @@ public class Sentry {
 				} else {
 					InternalStorage.getInstance().addRequest(request);
 				}
-
-				return null;
 			}
 
-			private byte[] readBytes(InputStream inputStream) throws IOException { 
+			private byte[] readBytes(InputStream inputStream) throws IOException {
 				// this dynamically extends to take the bytes you read
 				ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
 
@@ -523,7 +527,7 @@ public class Sentry {
 				return byteBuffer.toByteArray();
 			}
 
-		}.execute();
+		});
 
 	}
 
