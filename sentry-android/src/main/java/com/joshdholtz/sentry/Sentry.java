@@ -1,5 +1,38 @@
 package com.joshdholtz.sentry;
 
+import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.Uri;
+import android.os.Build;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.WindowManager;
+
+import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,7 +64,6 @@ import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -50,48 +82,16 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
-import org.apache.http.protocol.HTTP;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.joshdholtz.sentry.Sentry.SentryEventBuilder.SentryEventLevel;
-
-import android.content.Context;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.content.res.Configuration;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.net.Uri;
-import android.os.Build;
-import android.util.DisplayMetrics;
-import android.util.Log;
-import android.view.WindowManager;
-
 public class Sentry {
 
+    private static final String TAG = "Sentry";
 	private final static String VERSION = "0.2.0";
+    private final static String sentryVersion = "7";
+    private static final int MAX_QUEUE_LENGTH = 50;
+
+    public static boolean debug = false;
 
 	private Context context;
-
-	public final static String sentryVersion = "7";
-	public static boolean debug = false;
-
 	private String baseUrl;
 	private String dsn;
 	private PackageInfo packageInfo;
@@ -99,9 +99,6 @@ public class Sentry {
 	private SentryEventCaptureListener captureListener;
 	private JSONObject contexts = new JSONObject();
 	private Executor executor;
-
-	private static final String TAG = "Sentry";
-	private static final int MAX_QUEUE_LENGTH = 50;
 
 	private Sentry() {
 	}
@@ -275,32 +272,6 @@ public class Sentry {
 
 	}
 
-	public static void captureUncaughtException(Context context, Throwable t) {
-		final Writer result = new StringWriter();
-		final PrintWriter printWriter = new PrintWriter(result);
-		t.printStackTrace(printWriter);
-		try {
-			// Random number to avoid duplicate files
-			long random = System.currentTimeMillis();
-
-			// Embed version in stacktrace filename
-			File stacktrace = new File(getStacktraceLocation(context), "raven-" +  String.valueOf(random) + ".stacktrace");
-			log("Writing unhandled exception to: " + stacktrace.getAbsolutePath());
-
-			// Write the stacktrace to disk
-			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(stacktrace));
-			oos.writeObject(t);
-			oos.flush();
-			// Close up everything
-			oos.close();
-		} catch (Exception ebos) {
-			// Nothing much we can do about this - the game is over
-			ebos.printStackTrace();
-		}
-
-		log(result.toString());
-	}
-
 	private static String getCause(Throwable t, String culprit) {
 		final PackageInfo packageInfo = Sentry.getInstance().packageInfo;
 
@@ -316,11 +287,6 @@ public class Sentry {
 
 		return culprit;
 	}
-
-	private static File getStacktraceLocation(Context context) {
-		return new File(context.getCacheDir(), "crashes");
-	}
-
 
 	public static void captureEvent(SentryEventBuilder builder) {
 		final SentryEventRequest request;
@@ -358,27 +324,10 @@ public class Sentry {
 	    return activeNetworkInfo != null && activeNetworkInfo.isConnected();
 	}
 
-	public static class ExSSLSocketFactory extends SSLSocketFactory {
+	private static class ExSSLSocketFactory extends SSLSocketFactory {
 		  SSLContext sslContext = SSLContext.getInstance("TLS");
 
-		    public ExSSLSocketFactory(KeyStore truststore) throws NoSuchAlgorithmException, KeyManagementException, KeyStoreException, UnrecoverableKeyException {
-		        super(truststore);
-		        TrustManager x509TrustManager = new X509TrustManager() {
-		            public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-		            }
-
-		            public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-		            }
-
-		            public X509Certificate[] getAcceptedIssuers() {
-		                return null;
-		            }
-		        };
-
-		        sslContext.init(null, new TrustManager[] { x509TrustManager }, null);
-		    }
-
-		    public ExSSLSocketFactory(SSLContext context) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
+		    ExSSLSocketFactory(SSLContext context) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
 		       super(null);
 		       sslContext = context;
 		    }
@@ -394,7 +343,7 @@ public class Sentry {
 		    }
 		}
 
-	public static HttpClient getHttpsClient(HttpClient client) {
+	private static HttpClient getHttpsClient(HttpClient client) {
 	     try {
 			   X509TrustManager x509TrustManager = new X509TrustManager() {
 					@Override
