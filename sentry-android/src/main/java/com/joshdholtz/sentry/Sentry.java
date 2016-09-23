@@ -35,10 +35,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -98,10 +98,8 @@ public class Sentry {
 	private Map<String, Object> contexts = Collections.emptyMap();
 
 	private static final String TAG = "Sentry";
-	private static final String DEFAULT_BASE_URL = "https://app.getsentry.com";
 
 	private Sentry() {
-
 	}
 
 	private static void log(String text) {
@@ -234,14 +232,18 @@ public class Sentry {
 	}
 
 	public static void captureException(Throwable t) {
-		Sentry.captureException(t, SentryEventLevel.ERROR);
+		Sentry.captureException(t, t.getMessage(), SentryEventLevel.ERROR);
 	}
 
-	public static void captureException(Throwable t, SentryEventLevel level) {
+	public static void captureException(Throwable t, String message) {
+		Sentry.captureException(t, message, SentryEventLevel.ERROR);
+	}
+
+	public static void captureException(Throwable t, String message, SentryEventLevel level) {
 		String culprit = getCause(t, t.getMessage());
 
 		Sentry.captureEvent(new SentryEventBuilder()
-		.setMessage(t.getMessage())
+		.setMessage(message)
 		.setCulprit(culprit)
 		.setLevel(level)
 		.setException(t)
@@ -689,7 +691,7 @@ public class Sentry {
 		// dalvik.system.*
 		static final String isInternalPackage = "^(java|android|com\\.android|com\\.google\\.android|dalvik\\.system)\\..*";
 		
-		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+		private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
 		static {
 			sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 		}
@@ -700,7 +702,7 @@ public class Sentry {
 			return new JSONObject(event);
 		}
 
-		public static enum SentryEventLevel {
+		public enum SentryEventLevel {
 
 			FATAL("fatal"),
 			ERROR("error"),
