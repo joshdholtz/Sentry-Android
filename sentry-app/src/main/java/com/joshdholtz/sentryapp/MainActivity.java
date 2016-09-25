@@ -18,7 +18,11 @@ public class MainActivity extends AppCompatActivity {
         String yourDSN = "your-dsn";
         Sentry.init(this, yourDSN);
         Sentry.debug = true;
-        Sentry.captureMessage("OMG this works woooo");
+
+        Sentry.captureEvent(new Sentry.SentryEventBuilder()
+            .setMessage("OMG this works woooo")
+            .setStackTrace(Thread.currentThread().getStackTrace())
+        );
     }
 
     @Override
