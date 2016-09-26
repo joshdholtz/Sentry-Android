@@ -14,16 +14,13 @@ Below is an example of how to register Sentry-Android to handle uncaught excepti
 ``` java
 public class MainActivity extends Activity {
 
-	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-		// Sentry will look for uncaught exceptions from previous runs and send them
-		Sentry.init(this.getApplicationContext(), "YOUR-SENTRY-DSN");
-
-	}
-
+        // Sentry will look for uncaught exceptions from previous runs and send them
+        Sentry.init(this, "YOUR-SENTRY-DSN");
+    }
 }
 ```
 
@@ -127,22 +124,18 @@ function from inside a `SentryEventCaptureListener`.
 // each capture to set values that could change state
 Sentry.setCaptureListener(new SentryEventCaptureListener() {
 
-	@Override
-	public SentryEventBuilder beforeCapture(SentryEventBuilder builder) {
+    @Override
+    public SentryEventBuilder beforeCapture(SentryEventBuilder builder) {
 
-		// Needs permission - <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-		ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-		NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        // Needs permission - <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
 
-		// Sets extra key if wifi is connected
-		try {
-			builder.getExtra().put("wifi", String.valueOf(mWifi.isConnected()));
-			builder.getTags().put("tag_1", "value_1");
-		} catch (JSONException e) {}
-
-		return builder;
-	}
-
+        // Sets extra key if wifi is connected
+        return builder
+            .addExtra("wifi", String.valueOf(mWifi.isConnected()));
+            .addTag("tag_1", "value_1");
+    }
 });
 
 ```
@@ -162,4 +155,4 @@ Twitter: [@joshdholtz](http://twitter.com/joshdholtz)
 
 ## License
 
-Sentry-Android is available under the MIT license. See the LICENSE file for more info.
+Sentry-Android is available under the [MIT license](LICENSE).
