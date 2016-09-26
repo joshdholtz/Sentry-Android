@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
+**1.5.0** | Added breadcrumb support, added ability for single stacktrace, some bug fixes, enabled Sentry release tracking (thanks to [marcomorain](https://github.com/marcomorain))
 **1.4.4** | Sends up device, app, and OS context by default (thanks to [marcomorain](https://github.com/marcomorain))
 **1.4.3** | Fixes for a Google Play warning and added option to not use crash reporting (thanks to [ZeroStride](https://github.com/ZeroStride))
 **1.4.1** | Fixes for a potential memory leak and a crash (thanks to [Syhids](https://github.com/Syhids) and [woostrowski](https://github.com/woostrowski))
