@@ -93,6 +93,24 @@ Sentry.captureEvent(new Sentry.SentryEventBuilder()
 );
 ```
 
+### Capture Breadcrumbs
+You can record [breadcrumbs](https://docs.sentry.io/hosted/learn/breadcrumbs/) to
+track what happened in your application leading up to an error.
+
+There are 3 ways to log a breadcrumb.
+
+```java
+// Record that a user sent a HTTP POST to example.com and it was successful.
+Sentry.addHttpBreadcrumb("http://example.com", "POST", 200);
+
+// Record the fact that user clicked a button to go from the main menu to the
+// settings menu.
+Sentry.addNavigationBreadcrumb("user.click", "main menu", "settings");
+
+// Record a general,  application specific event
+Sentry.addBreadcrumb("user.state_change", "logged in");
+```
+
 
 ### Release Tracking
 

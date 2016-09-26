@@ -22,6 +22,7 @@ import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.EnglishReasonPhraseCatalog;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
@@ -60,6 +61,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -81,6 +83,7 @@ public class Sentry {
     private static final String TAG = "Sentry";
     private final static String sentryVersion = "7";
     private static final int MAX_QUEUE_LENGTH = 50;
+    private static final int MAX_BREADCRUMBS = 10;
 
     public static boolean debug = false;
 
@@ -92,6 +95,7 @@ public class Sentry {
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
+    private LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
 
     public enum SentryEventLevel {
 
@@ -302,8 +306,9 @@ public class Sentry {
         final SentryEventRequest request;
         builder.event.put("contexts", sentry.contexts);
         builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
-
+        builder.event.put("breadcrumbs", Sentry.getInstance().currentBreadcrumbs());
         if (sentry.captureListener != null) {
+
 
             builder = sentry.captureListener.beforeCapture(builder);
             if (builder == null) {
@@ -612,6 +617,136 @@ public class Sentry {
 
         SentryEventBuilder beforeCapture(SentryEventBuilder builder);
 
+    }
+
+    private final static class Breadcrumb {
+
+        enum Type {
+
+            Default("default"),
+            HTTP("http"),
+            Navigation("navigation");
+
+            private final String value;
+
+            Type(String value) {
+                this.value = value;
+            }
+        }
+
+        final long timestamp;
+        final Type type;
+        final String message;
+        final String category;
+        final SentryEventLevel level;
+        final Map<String, String> data = new HashMap<>();
+
+        Breadcrumb(long timestamp, Type type, String message, String category, SentryEventLevel level) {
+            this.timestamp = timestamp;
+            this.type = type;
+            this.message = message;
+            this.category = category;
+            this.level = level;
+        }
+    }
+
+    private void pushBreadcrumb(Breadcrumb b) {
+        while (breadcrumbs.size() >= MAX_BREADCRUMBS) {
+            breadcrumbs.removeFirst();
+        }
+        breadcrumbs.add(b);
+    }
+
+    /**
+     * Record a breadcrumb to log a navigation from `from` to `to`.
+     * @param category A category to label the event under. This generally is similar to a logger
+     *                 name, and will let you more easily understand the area an event took place, such as auth.
+     * @param from A string representing the original application state / location.
+     * @param to A string representing the new application state / location.
+     *
+     * @see com.joshdholtz.sentry.Sentry#addHttpBreadcrumb(String, String, int)
+     */
+    public static void addNavigationBreadcrumb(String category, String from, String to) {
+        final Breadcrumb b = new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.Navigation,
+            "",
+            category,
+            SentryEventLevel.INFO);
+
+        b.data.put("from", from);
+        b.data.put("to", to);
+        getInstance().pushBreadcrumb(b);
+    }
+
+    /**
+     * Record a HTTP request breadcrumb. This represents an HTTP request transmitted from your
+     * application. This could be an AJAX request from a web application, or a server-to-server HTTP
+     * request to an API service provider, etc.
+     *
+     * @param url The request URL.
+     * @param method The HTTP request method.
+     * @param statusCode The HTTP status code of the response.
+     *
+     * @see com.joshdholtz.sentry.Sentry#addHttpBreadcrumb(String, String, int)
+     */
+    public static void addHttpBreadcrumb(String url, String method, int statusCode) {
+        final String reason = EnglishReasonPhraseCatalog.INSTANCE.getReason(statusCode, Locale.US);
+        final Breadcrumb b = new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.HTTP,
+            "",
+            String.format("http.%s", method.toLowerCase()),
+            SentryEventLevel.INFO);
+
+        b.data.put("url", url);
+        b.data.put("method", method);
+        b.data.put("status_code", Integer.toString(statusCode));
+        b.data.put("reason", reason);
+        getInstance().pushBreadcrumb(b);
+    }
+
+    /**
+     * Sentry supports a concept called Breadcrumbs, which is a trail of events which happened prior
+     * to an issue. Often times these events are very similar to traditional logs, but also have the
+     * ability to record more rich structured data.
+     *
+     * @param category A category to label the event under. This generally is similar to a logger
+     *                 name, and will let you more easily understand the area an event took place,
+     *                 such as auth.
+     *
+     * @param message A string describing the event. The most common vector, often used as a drop-in
+     *                for a traditional log message.
+     *
+     * See https://docs.sentry.io/hosted/learn/breadcrumbs/
+     *
+     */
+    public static void addBreadcrumb(String category, String message) {
+        getInstance().pushBreadcrumb(new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.Default,
+            message,
+            category,
+            SentryEventLevel.INFO));
+    }
+
+    private JSONArray currentBreadcrumbs() {
+        final JSONArray crumbs = new JSONArray();
+        for (Breadcrumb breadcrumb : breadcrumbs) {
+            final JSONObject json = new JSONObject();
+            try {
+                json.put("timestamp", breadcrumb.timestamp);
+                json.put("type", breadcrumb.type.value);
+                json.put("message", breadcrumb.message);
+                json.put("category", breadcrumb.category);
+                json.put("level", breadcrumb.level.value);
+                json.put("data", new JSONObject(breadcrumb.data));
+            } catch (JSONException jse) {
+                Log.e(TAG, "Error serializing breadcrumbs", jse);
+            }
+            crumbs.put(json);
+        }
+        return crumbs;
     }
 
     public static class SentryEventRequest implements Serializable {

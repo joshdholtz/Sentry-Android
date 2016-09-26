@@ -19,10 +19,14 @@ public class MainActivity extends AppCompatActivity {
         Sentry.init(this, yourDSN);
         Sentry.debug = true;
 
+        Sentry.addNavigationBreadcrumb("activity.main", "here", "there");
+        Sentry.addHttpBreadcrumb("http://example.com", "GET", 202);
+
         Sentry.captureEvent(new Sentry.SentryEventBuilder()
             .setMessage("OMG this works woooo")
             .setStackTrace(Thread.currentThread().getStackTrace())
         );
+
     }
 
     @Override
@@ -32,14 +36,21 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    public void onClickBreak(View view) {
+    private void crash() {
         String s = null;
         s.length();
     }
 
+    public void onClickBreak(View view) {
+        Sentry.addBreadcrumb("button.click", "break button");
+        crash();
+
+    }
+
     public void onClickCapture(View view) {
+        Sentry.addBreadcrumb("button.click", "capture button");
         try {
-            onClickBreak(view);
+            crash();
         } catch (Exception e) {
             Sentry.captureException(e, "Exception caught in click handler");
         }
