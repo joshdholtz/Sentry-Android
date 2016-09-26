@@ -1,5 +1,6 @@
 package com.joshdholtz.sentry;
 
+import android.Manifest.permission;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -326,14 +327,14 @@ public class Sentry {
         doCaptureEventPost(request);
     }
 
-    private static boolean shouldAttemptPost() {
-        PackageManager pm = Sentry.getInstance().context.getPackageManager();
-        int hasPerm = pm.checkPermission(android.Manifest.permission.ACCESS_NETWORK_STATE, Sentry.getInstance().context.getPackageName());
-        if (hasPerm == PackageManager.PERMISSION_DENIED) {
-            return true;
+    private boolean shouldAttemptPost() {
+        PackageManager pm = context.getPackageManager();
+        int hasPerm = pm.checkPermission(permission.ACCESS_NETWORK_STATE, context.getPackageName());
+        if (hasPerm != PackageManager.PERMISSION_GRANTED) {
+            return false;
         }
 
-        ConnectivityManager connectivityManager = (ConnectivityManager) Sentry.getInstance().context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
@@ -390,13 +391,12 @@ public class Sentry {
     }
 
     private static void doCaptureEventPost(final SentryEventRequest request) {
+        final Sentry sentry = Sentry.getInstance();
 
-        if (!shouldAttemptPost()) {
+        if (!sentry.shouldAttemptPost()) {
             InternalStorage.getInstance().addRequest(request);
             return;
         }
-
-        final Sentry sentry = Sentry.getInstance();
 
         sentry.executor.execute(new Runnable() {
             @Override
