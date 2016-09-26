@@ -79,7 +79,6 @@ import javax.net.ssl.X509TrustManager;
 public class Sentry {
 
     private static final String TAG = "Sentry";
-    private final static String VERSION = "0.2.0";
     private final static String sentryVersion = "7";
     private static final int MAX_QUEUE_LENGTH = 50;
 
@@ -220,7 +219,7 @@ public class Sentry {
         String secretKey = authorityParts[1];
 
         header += "Sentry sentry_version=" + sentryVersion + ",";
-        header += "sentry_client=sentry-android/" + VERSION + ",";
+        header += "sentry_client=sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION + ",";
         header += "sentry_timestamp=" + System.currentTimeMillis() + ",";
         header += "sentry_key=" + publicKey + ",";
         header += "sentry_secret=" + secretKey;
@@ -422,7 +421,7 @@ public class Sentry {
                 boolean success = false;
                 try {
                     httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader());
-                    httpPost.setHeader("User-Agent", "sentry-android/" + VERSION);
+                    httpPost.setHeader("User-Agent", "sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION);
                     httpPost.setHeader("Content-Type", "application/json; charset=utf-8");
 
                     httpPost.setEntity(new StringEntity(request.getRequestData(), HTTP.UTF_8));
