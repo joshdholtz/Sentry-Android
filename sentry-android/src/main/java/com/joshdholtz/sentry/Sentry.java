@@ -87,7 +87,7 @@ public class Sentry {
     private Context context;
     private String baseUrl;
     private String dsn;
-    private PackageInfo packageInfo;
+    private AppInfo appInfo = AppInfo.Empty;
     private int verifySsl;
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
@@ -130,7 +130,9 @@ public class Sentry {
     }
 
     public static void init(Context context, String dsn, boolean setupUncaughtExceptionHandler) {
-        Sentry.getInstance().context = context.getApplicationContext();
+        final Sentry sentry = Sentry.getInstance();
+
+        sentry.context = context.getApplicationContext();
 
         Uri uri = Uri.parse(dsn);
         String port = "";
@@ -138,15 +140,15 @@ public class Sentry {
             port = ":" + uri.getPort();
         }
 
-        Sentry.getInstance().baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
-        Sentry.getInstance().dsn = dsn;
-        Sentry.getInstance().packageInfo = findPackage(Sentry.getInstance().context);
-        Sentry.getInstance().verifySsl = getVerifySsl(dsn);
-        Sentry.getInstance().contexts = readContexts(Sentry.getInstance().context, Sentry.getInstance().packageInfo);
-        Sentry.getInstance().executor = fixedQueueDiscardingExecutor(MAX_QUEUE_LENGTH);
+        sentry.baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
+        sentry.dsn = dsn;
+        sentry.appInfo = AppInfo.Read(sentry.context);
+        sentry.verifySsl = getVerifySsl(dsn);
+        sentry.contexts = readContexts(sentry.context, sentry.appInfo);
+        sentry.executor = fixedQueueDiscardingExecutor(MAX_QUEUE_LENGTH);
 
         if (setupUncaughtExceptionHandler) {
-            Sentry.getInstance().setupUncaughtExceptionHandler();
+            sentry.setupUncaughtExceptionHandler();
         }
     }
 
@@ -207,28 +209,29 @@ public class Sentry {
         sendAllCachedCapturedEvents();
     }
 
-    private static String createXSentryAuthHeader() {
-        String header = "";
+    private static String createXSentryAuthHeader(final String dsn) {
 
-        Uri uri = Uri.parse(Sentry.getInstance().dsn);
+        final StringBuilder header = new StringBuilder();
 
-        String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
+        final Uri uri = Uri.parse(dsn);
 
-        String[] authorityParts = authority.split(":");
-        String publicKey = authorityParts[0];
-        String secretKey = authorityParts[1];
+        final String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
 
-        header += "Sentry sentry_version=" + sentryVersion + ",";
-        header += "sentry_client=sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION + ",";
-        header += "sentry_timestamp=" + System.currentTimeMillis() + ",";
-        header += "sentry_key=" + publicKey + ",";
-        header += "sentry_secret=" + secretKey;
+        final String[] authorityParts = authority.split(":");
+        final String publicKey = authorityParts[0];
+        final String secretKey = authorityParts[1];
 
-        return header;
+        header.append("Sentry ")
+            .append(String.format("sentry_version=%s,", sentryVersion))
+            .append(String.format("sentry_client=sentry-android/%s,", BuildConfig.SENTRY_ANDROID_VERSION))
+            .append(String.format("sentry_key=%s,", publicKey))
+            .append(String.format("sentry_secret=%s", secretKey));
+
+        return header.toString();
     }
 
-    private static String getProjectId() {
-        Uri uri = Uri.parse(Sentry.getInstance().dsn);
+    private String getProjectId() {
+        Uri uri = Uri.parse(this.dsn);
         String path = uri.getPath();
         String projectId = path.substring(path.lastIndexOf("/") + 1);
 
@@ -282,14 +285,11 @@ public class Sentry {
     }
 
     private static String getCause(Throwable t, String culprit) {
-        final PackageInfo packageInfo = Sentry.getInstance().packageInfo;
 
-        if (packageInfo == null) {
-            return culprit;
-        }
+        final String packageName = Sentry.getInstance().appInfo.name;
 
         for (StackTraceElement stackTrace : t.getStackTrace()) {
-            if (stackTrace.toString().contains(packageInfo.packageName)) {
+            if (stackTrace.toString().contains(packageName)) {
                 return stackTrace.toString();
             }
         }
@@ -298,14 +298,14 @@ public class Sentry {
     }
 
     public static void captureEvent(SentryEventBuilder builder) {
+        final Sentry sentry = Sentry.getInstance();
         final SentryEventRequest request;
-        builder.event.put("contexts", Sentry.getInstance().contexts);
-        if (Sentry.getInstance().packageInfo != null) {
-            builder.setRelease(Integer.toString(Sentry.getInstance().packageInfo.versionCode));
-        }
-        if (Sentry.getInstance().captureListener != null) {
+        builder.event.put("contexts", sentry.contexts);
+        builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
 
-            builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+        if (sentry.captureListener != null) {
+
+            builder = sentry.captureListener.beforeCapture(builder);
             if (builder == null) {
                 Log.e(Sentry.TAG, "SentryEventBuilder in captureEvent is null");
                 return;
@@ -391,11 +391,13 @@ public class Sentry {
             return;
         }
 
-        getInstance().executor.execute(new Runnable() {
+        final Sentry sentry = Sentry.getInstance();
+
+        sentry.executor.execute(new Runnable() {
             @Override
             public void run() {
-                int projectId = Integer.parseInt(getProjectId());
-                String url = Sentry.getInstance().baseUrl + "/api/" + projectId + "/store/";
+                int projectId = Integer.parseInt(sentry.getProjectId());
+                String url = sentry.baseUrl + "/api/" + projectId + "/store/";
 
                 log("Sending to URL - " + url);
 
@@ -420,7 +422,7 @@ public class Sentry {
 
                 boolean success = false;
                 try {
-                    httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader());
+                    httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader(sentry.dsn));
                     httpPost.setHeader("User-Agent", "sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION);
                     httpPost.setHeader("Content-Type", "application/json; charset=utf-8");
 
@@ -486,6 +488,7 @@ public class Sentry {
 
         });
 
+
     }
 
     private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
@@ -499,17 +502,19 @@ public class Sentry {
 
         @Override
         public void uncaughtException(Thread thread, Throwable e) {
+
+            final Sentry sentry = Sentry.getInstance();
+
             // Here you should have a more robust, permanent record of problems
             SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventLevel.FATAL);
-            if (Sentry.getInstance().packageInfo != null) {
-                builder.setRelease(Integer.toString(Sentry.getInstance().packageInfo.versionCode));
-            }
-            if (Sentry.getInstance().captureListener != null) {
-                builder = Sentry.getInstance().captureListener.beforeCapture(builder);
+            builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
+
+            if (sentry.captureListener != null) {
+                builder = sentry.captureListener.beforeCapture(builder);
             }
 
             if (builder != null) {
-                builder.event.put("contexts", Sentry.getInstance().contexts);
+                builder.event.put("contexts", sentry.contexts);
                 InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
             } else {
                 Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
@@ -963,12 +968,41 @@ public class Sentry {
         }
     }
 
-    private static JSONObject readContexts(Context context, PackageInfo packageInfo) {
+    /**
+     * Store a tuple of package version information captured from PackageInfo
+     *
+     * @see PackageInfo
+     */
+    private final static class AppInfo {
+        final static AppInfo Empty = new AppInfo("", "", 0);
+        final String name;
+        final String versionName;
+        final int versionCode;
+
+        AppInfo(String name, String versionName, int versionCode) {
+            this.name = name;
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+        }
+
+        static AppInfo Read(final Context context) {
+            try {
+                final PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+                return new AppInfo(info.packageName, info.versionName, info.versionCode);
+            } catch (Exception e) {
+                Log.e(TAG, "Error reading package context", e);
+                return Empty;
+            }
+        }
+    }
+
+
+    private static JSONObject readContexts(Context context, AppInfo appInfo) {
         final JSONObject contexts = new JSONObject();
         try {
             contexts.put("os", osContext());
             contexts.put("device", deviceContext(context));
-            contexts.put("package", packageContext(packageInfo));
+            contexts.put("package", packageContext(appInfo));
         } catch (JSONException e) {
             Log.e(TAG, "Failed to build device contexts", e);
         }
@@ -1053,14 +1087,14 @@ public class Sentry {
      * Read the package data into map to be sent as an event context item.
      * This is not a built-in context type.
      */
-    private static JSONObject packageContext(PackageInfo packageInfo) {
+    private static JSONObject packageContext(AppInfo appInfo) {
         final JSONObject pack = new JSONObject();
         try {
             pack.put("type", "package");
-            pack.put("name", packageInfo.packageName);
-            pack.put("version_name", packageInfo.versionName);
-            pack.put("version_code", Integer.toString(packageInfo.versionCode));
-        } catch (Exception e) {
+            pack.put("name", appInfo.name);
+            pack.put("version_name", appInfo.versionName);
+            pack.put("version_code", Integer.toString(appInfo.versionCode));
+        } catch (JSONException e) {
             Log.e(TAG, "Error reading package context", e);
         }
         return pack;
@@ -1071,14 +1105,5 @@ public class Sentry {
      */
     private static boolean Present(String s) {
         return s != null && s.length() > 0;
-    }
-
-    private static PackageInfo findPackage(Context context) {
-        try {
-            return context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-        } catch (Exception e) {
-            Log.e(TAG, "Error reading package context", e);
-            return null;
-        }
     }
 }
