@@ -883,7 +883,7 @@ public class Sentry {
                     exception.put("type", t.getClass().getSimpleName());
                     exception.put("value", t.getMessage());
                     exception.put("module", t.getClass().getPackage().getName());
-                    exception.put("stacktrace", getStackTrace(t));
+                    exception.put("stacktrace", getStackTrace(t.getStackTrace()));
 
                     values.put(exception);
                 } catch (JSONException e) {
@@ -905,17 +905,34 @@ public class Sentry {
             return this;
         }
 
-        public static JSONObject getStackTrace(Throwable t) throws JSONException {
-            JSONArray frameList = new JSONArray();
+        private static JSONObject getStackTrace(StackTraceElement[] stackFrames) {
 
-            for (StackTraceElement ste : t.getStackTrace()) {
-                frameList.put(frameJson(ste));
+            JSONObject stacktrace  = new JSONObject();
+
+            try {
+                JSONArray frameList = new JSONArray();
+                for (StackTraceElement frame : stackFrames) {
+                    frameList.put(frameJson(frame));
+                }
+                stacktrace.put("frames", frameList);
+            } catch (JSONException e) {
+                Log.e(TAG, "Error serializing stack frames", e);
             }
 
-            JSONObject frameHash = new JSONObject();
-            frameHash.put("frames", frameList);
+            return stacktrace;
+        }
 
-            return frameHash;
+        /**
+         * Add a stack trace to the event.
+         * A stack trace for the current thread can be obtained by using
+         * `Thread.currentThread().getStackTrace()`.
+         *
+         * @see Thread#currentThread()
+         * @see Thread#getStackTrace()
+         */
+        public SentryEventBuilder setStackTrace(StackTraceElement[] stackTrace) {
+            this.event.put("stacktrace", getStackTrace(stackTrace));
+            return this;
         }
 
         // Convert a StackTraceElement to a sentry.interfaces.stacktrace.Stacktrace JSON object.
