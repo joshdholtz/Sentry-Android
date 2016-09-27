@@ -15,7 +15,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        String yourDSN = "your-dsn";
+        String yourDSN = "https://cd95d48687a54ee1840a16ecef394c93:c9def31f1d5940b18b2a9b4ba149b19d@sentry.io/75499";
         Sentry.init(this, yourDSN);
         Sentry.debug = true;
 
@@ -50,7 +50,9 @@ public class MainActivity extends AppCompatActivity {
     public void onClickCapture(View view) {
         Sentry.addBreadcrumb("button.click", "capture button");
         try {
-            crash();
+            Sentry.captureEvent(new Sentry.SentryEventBuilder()
+                .setMessage("test from view")
+                .setThreads(Thread.getAllStackTraces()));
         } catch (Exception e) {
             Sentry.captureException(e, "Exception caught in click handler");
         }

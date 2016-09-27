@@ -60,13 +60,16 @@ import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
@@ -1071,6 +1074,37 @@ public class Sentry {
          */
         public SentryEventBuilder setStackTrace(StackTraceElement[] stackTrace) {
             this.event.put("stacktrace", getStackTrace(stackTrace));
+            return this;
+        }
+
+        public SentryEventBuilder setThreads(Map<Thread, StackTraceElement[]> allThreads) {
+            final Thread current = Thread.currentThread();
+            final JSONArray threads = new JSONArray();
+
+            final SortedMap<Thread, StackTraceElement[]> sortedThreads = new TreeMap<>(new Comparator<Thread>() {
+                @Override
+                public int compare(Thread lhs, Thread rhs) {
+                    // This cast to long could overflow, in which case the threads will be out of
+                    // order in the Sentry UI. That's not a problem.
+                    return (int)(lhs.getId() - rhs.getId());
+                }
+            });
+            sortedThreads.putAll(allThreads);
+
+            for (Map.Entry<Thread, StackTraceElement[]> thread : sortedThreads.entrySet()) {
+                JSONObject t = new JSONObject();
+                try {
+                    t.put("id", thread.getKey().getId());
+                    t.put("current", thread.getKey() == current);
+                    t.put("name", thread.getKey().getName());
+                    t.put("stacktrace", getStackTrace(thread.getValue()));
+
+                } catch (JSONException je) {
+                    Log.e(TAG, "Error serializing thread", je);
+                }
+                threads.put(t);
+            }
+            this.event.put("threads", threads);
             return this;
         }
 
