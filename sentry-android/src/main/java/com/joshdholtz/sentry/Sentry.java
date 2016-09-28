@@ -57,6 +57,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -556,7 +557,7 @@ public class Sentry {
                     writeObject(context, new ArrayList<Sentry.SentryEventRequest>());
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error initializing storage", e);
             }
             this.unsentRequests = this.readObject(context);
         }
@@ -598,7 +599,7 @@ public class Sentry {
                 oos.close();
                 fos.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error saving to storage", e);
             }
         }
 
@@ -611,7 +612,7 @@ public class Sentry {
                 fis.close();
                 return requests;
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error loading from storage", e);
             }
             return new ArrayList<>();
         }
@@ -789,6 +790,16 @@ public class Sentry {
 
     }
 
+    /**
+     * The Sentry server assumes the time is in UTC.
+     * The timestamp should be in ISO 8601 format, without a timezone.
+     */
+    private static DateFormat iso8601() {
+        final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return format;
+    }
+
     public static class SentryEventBuilder implements Serializable {
 
         private static final long serialVersionUID = -8589756678369463988L;
@@ -801,11 +812,7 @@ public class Sentry {
         // dalvik.system.*
         static final String isInternalPackage = "^(java|android|com\\.android|com\\.google\\.android|dalvik\\.system)\\..*";
 
-        private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-
-        static {
-            sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-        }
+        private final static DateFormat timestampFormat = iso8601();
 
         private final Map<String, Object> event;
 
@@ -849,7 +856,7 @@ public class Sentry {
          * @return SentryEventBuilder
          */
         public SentryEventBuilder setTimestamp(long timestamp) {
-            event.put("timestamp", sdf.format(new Date(timestamp)));
+            event.put("timestamp", timestampFormat.format(new Date(timestamp)));
             return this;
         }
 
