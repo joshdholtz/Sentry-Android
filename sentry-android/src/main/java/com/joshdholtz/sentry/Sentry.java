@@ -277,6 +277,10 @@ public class Sentry {
         Sentry.captureException(t, message, SentryEventLevel.ERROR);
     }
 
+    public static void captureException(Throwable t, SentryEventLevel level) {
+        captureException(t, t.getMessage(), level);
+    }
+
     public static void captureException(Throwable t, String message, SentryEventLevel level) {
         String culprit = getCause(t, t.getMessage());
 
