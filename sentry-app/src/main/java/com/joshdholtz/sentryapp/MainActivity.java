@@ -8,7 +8,13 @@ import android.view.View;
 
 import com.joshdholtz.sentry.Sentry;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class MainActivity extends AppCompatActivity {
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,8 +43,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void crash() {
-        String s = null;
-        s.length();
+        try {
+            executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    String s = null;
+                    s.length();
+                }
+            }).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void onClickBreak(View view) {
