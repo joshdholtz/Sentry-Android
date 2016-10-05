@@ -1054,9 +1054,22 @@ public class Sentry {
 
             try {
                 JSONArray frameList = new JSONArray();
-                for (StackTraceElement frame : stackFrames) {
-                    frameList.put(frameJson(frame));
+
+                // Java stack frames are in the opposite order from what the Sentry client API expects.
+                // > The zeroth element of the array (assuming the array's length is non-zero)
+                // > represents the top of the stack, which is the last method invocation in the
+                // > sequence.
+                // See:
+                // https://docs.oracle.com/javase/7/docs/api/java/lang/Throwable.html#getStackTrace()
+                // https://docs.sentry.io/clientdev/interfaces/#failure-interfaces
+                //
+                // This code uses array indices rather a foreach construct since there is no built-in
+                // reverse iterator in the Java standard library. To use a foreach loop would require
+                // calling Collections.reverse which would require copying the array to a list.
+                for (int i = stackFrames.length - 1; i >= 0; i--) {
+                    frameList.put(frameJson(stackFrames[i]));
                 }
+
                 stacktrace.put("frames", frameList);
             } catch (JSONException e) {
                 Log.e(TAG, "Error serializing stack frames", e);
