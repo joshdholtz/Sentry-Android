@@ -91,9 +91,9 @@ public class Sentry {
 
     private Context context;
     private String baseUrl;
-    private String dsn;
+    private Uri dsn;
     private AppInfo appInfo = AppInfo.Empty;
-    private int verifySsl;
+    private boolean verifySsl;
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
@@ -147,7 +147,7 @@ public class Sentry {
         }
 
         sentry.baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
-        sentry.dsn = dsn;
+        sentry.dsn = uri;
         sentry.appInfo = AppInfo.Read(sentry.context);
         sentry.verifySsl = getVerifySsl(dsn);
         sentry.contexts = readContexts(sentry.context, sentry.appInfo);
@@ -178,14 +178,13 @@ public class Sentry {
             threadFactory, new ThreadPoolExecutor.DiscardPolicy()); // Discard exceptions
     }
 
-    private static int getVerifySsl(String dsn) {
-        int verifySsl = 1;
+    private static boolean getVerifySsl(String dsn) {
         List<NameValuePair> params = getAllGetParams(dsn);
         for (NameValuePair param : params) {
             if (param.getName().equals("verify_ssl"))
-                return Integer.parseInt(param.getValue());
+                return Integer.parseInt(param.getValue()) != 0;
         }
-        return verifySsl;
+        return false;
     }
 
     private static List<NameValuePair> getAllGetParams(String dsn) {
@@ -215,13 +214,11 @@ public class Sentry {
         sendAllCachedCapturedEvents();
     }
 
-    private static String createXSentryAuthHeader(final String dsn) {
+    private static String createXSentryAuthHeader(Uri dsn) {
 
         final StringBuilder header = new StringBuilder();
 
-        final Uri uri = Uri.parse(dsn);
-
-        final String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
+        final String authority = dsn.getAuthority().replace("@" + dsn.getHost(), "");
 
         final String[] authorityParts = authority.split(":");
         final String publicKey = authorityParts[0];
@@ -236,9 +233,8 @@ public class Sentry {
         return header.toString();
     }
 
-    private String getProjectId() {
-        Uri uri = Uri.parse(this.dsn);
-        String path = uri.getPath();
+    private static String getProjectId(Uri dsn) {
+        String path = dsn.getPath();
         String projectId = path.substring(path.lastIndexOf("/") + 1);
 
         return projectId;
@@ -406,13 +402,13 @@ public class Sentry {
         sentry.executor.execute(new Runnable() {
             @Override
             public void run() {
-                int projectId = Integer.parseInt(sentry.getProjectId());
+                int projectId = Integer.parseInt(getProjectId(sentry.dsn));
                 String url = sentry.baseUrl + "/api/" + projectId + "/store/";
 
                 log("Sending to URL - " + url);
 
                 HttpClient httpClient;
-                if (Sentry.getInstance().verifySsl != 0) {
+                if (Sentry.getInstance().verifySsl) {
                     log("Using http client");
                     httpClient = new DefaultHttpClient();
                 } else {
