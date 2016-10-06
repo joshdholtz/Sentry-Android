@@ -86,6 +86,7 @@ public class Sentry {
     private final static String sentryVersion = "7";
     private static final int MAX_QUEUE_LENGTH = 50;
     private static final int MAX_BREADCRUMBS = 10;
+    private static boolean isInitialized = false;
 
     public static boolean debug = false;
 
@@ -156,6 +157,12 @@ public class Sentry {
         if (setupUncaughtExceptionHandler) {
             sentry.setupUncaughtExceptionHandler();
         }
+
+        isInitialized = true;
+    }
+
+    public static boolean isInitialized(){
+        return isInitialized;
     }
 
     private static Executor fixedQueueDiscardingExecutor(int queueSize) {
