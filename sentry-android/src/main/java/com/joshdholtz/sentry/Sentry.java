@@ -208,7 +208,7 @@ public class Sentry {
         if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
             // Register default exceptions handler
             Thread.setDefaultUncaughtExceptionHandler(
-                new SentryUncaughtExceptionHandler(currentHandler));
+                new SentryUncaughtExceptionHandler(currentHandler, InternalStorage.getInstance()));
         }
 
         sendAllCachedCapturedEvents();
@@ -497,13 +497,15 @@ public class Sentry {
 
     }
 
-    private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
+    private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
+        private final InternalStorage storage;
         private final UncaughtExceptionHandler defaultExceptionHandler;
 
         // constructor
-        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler) {
+        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, InternalStorage storage) {
             defaultExceptionHandler = pDefaultExceptionHandler;
+            this.storage = storage;
         }
 
         @Override
@@ -521,7 +523,7 @@ public class Sentry {
 
             if (builder != null) {
                 builder.event.put("contexts", sentry.contexts);
-                InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
+                storage.addRequest(new SentryEventRequest(builder));
             } else {
                 Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
             }
