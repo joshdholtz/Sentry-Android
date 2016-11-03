@@ -134,7 +134,7 @@ Sentry.setCaptureListener(new SentryEventCaptureListener() {
 
         // Sets extra key if wifi is connected
         return builder
-            .addExtra("wifi", String.valueOf(mWifi.isConnected()));
+            .addExtra("wifi", String.valueOf(mWifi.isConnected()))
             .addTag("tag_1", "value_1");
     }
 });
