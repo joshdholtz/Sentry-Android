@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
 
 Version | Changes
 --- | ---
-**1.5.2** | Use the [versionName](https://developer.android.com/studio/publish/versioning.html#appversioning), rather than versionCode, as the default value for the release field of events (thanks to [FelixBondarenko](https://github.com/FelixBondarenko)).
+**1.5.2** | Send stack-frames to Sentry in the correct order. [#95](https://github.com/joshdholtz/Sentry-Android/pull/95).<br/> Use the [versionName](https://developer.android.com/studio/publish/versioning.html#appversioning), rather than versionCode, as the default value for the release field of events (thanks to [FelixBondarenko](https://github.com/FelixBondarenko)).
 **1.5.1** | Revert accidental API removal of `captureException(Throwable, SentryEventLevel)`.
 **1.5.0** | Add Breadcrumb support [#70](https://github.com/joshdholtz/Sentry-Android/pull/70).<br/>Add release tracking by default [#78](https://github.com/joshdholtz/Sentry-Android/pull/78).<br/>Add the ability to attach a stack-trace to any event [#81](https://github.com/joshdholtz/Sentry-Android/issues/81).<br/>Use a fixed-size thread-pool for sending events [#80](https://github.com/joshdholtz/Sentry-Android/pull/80).<br/>Make it easier to add a message when capturing an exception [#77](https://github.com/joshdholtz/Sentry-Android/pull/77).<br/>Added helper methods for addExtra and addTag [#74](https://github.com/joshdholtz/Sentry-Android/pull/74).<br/>(thanks to [marcomorain](https://github.com/marcomorain))
 **1.4.4** | Sends up device, app, and OS context by default (thanks to [marcomorain](https://github.com/marcomorain))
