@@ -307,7 +307,7 @@ public class Sentry {
         final Sentry sentry = Sentry.getInstance();
         final SentryEventRequest request;
         builder.event.put("contexts", sentry.contexts);
-        builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
+        builder.setRelease(sentry.appInfo.versionName);
         builder.event.put("breadcrumbs", Sentry.getInstance().currentBreadcrumbs());
         if (sentry.captureListener != null) {
 
