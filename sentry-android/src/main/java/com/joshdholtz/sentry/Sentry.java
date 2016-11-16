@@ -57,6 +57,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -90,9 +91,9 @@ public class Sentry {
 
     private Context context;
     private String baseUrl;
-    private String dsn;
+    private Uri dsn;
     private AppInfo appInfo = AppInfo.Empty;
-    private int verifySsl;
+    private boolean verifySsl;
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
@@ -146,7 +147,7 @@ public class Sentry {
         }
 
         sentry.baseUrl = uri.getScheme() + "://" + uri.getHost() + port;
-        sentry.dsn = dsn;
+        sentry.dsn = uri;
         sentry.appInfo = AppInfo.Read(sentry.context);
         sentry.verifySsl = getVerifySsl(dsn);
         sentry.contexts = readContexts(sentry.context, sentry.appInfo);
@@ -177,14 +178,13 @@ public class Sentry {
             threadFactory, new ThreadPoolExecutor.DiscardPolicy()); // Discard exceptions
     }
 
-    private static int getVerifySsl(String dsn) {
-        int verifySsl = 1;
+    private static boolean getVerifySsl(String dsn) {
         List<NameValuePair> params = getAllGetParams(dsn);
         for (NameValuePair param : params) {
             if (param.getName().equals("verify_ssl"))
-                return Integer.parseInt(param.getValue());
+                return Integer.parseInt(param.getValue()) != 0;
         }
-        return verifySsl;
+        return false;
     }
 
     private static List<NameValuePair> getAllGetParams(String dsn) {
@@ -208,19 +208,17 @@ public class Sentry {
         if (!(currentHandler instanceof SentryUncaughtExceptionHandler)) {
             // Register default exceptions handler
             Thread.setDefaultUncaughtExceptionHandler(
-                new SentryUncaughtExceptionHandler(currentHandler));
+                new SentryUncaughtExceptionHandler(currentHandler, InternalStorage.getInstance()));
         }
 
         sendAllCachedCapturedEvents();
     }
 
-    private static String createXSentryAuthHeader(final String dsn) {
+    private static String createXSentryAuthHeader(Uri dsn) {
 
         final StringBuilder header = new StringBuilder();
 
-        final Uri uri = Uri.parse(dsn);
-
-        final String authority = uri.getAuthority().replace("@" + uri.getHost(), "");
+        final String authority = dsn.getAuthority().replace("@" + dsn.getHost(), "");
 
         final String[] authorityParts = authority.split(":");
         final String publicKey = authorityParts[0];
@@ -235,9 +233,8 @@ public class Sentry {
         return header.toString();
     }
 
-    private String getProjectId() {
-        Uri uri = Uri.parse(this.dsn);
-        String path = uri.getPath();
+    private static String getProjectId(Uri dsn) {
+        String path = dsn.getPath();
         String projectId = path.substring(path.lastIndexOf("/") + 1);
 
         return projectId;
@@ -310,7 +307,7 @@ public class Sentry {
         final Sentry sentry = Sentry.getInstance();
         final SentryEventRequest request;
         builder.event.put("contexts", sentry.contexts);
-        builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
+        builder.setRelease(sentry.appInfo.versionName);
         builder.event.put("breadcrumbs", Sentry.getInstance().currentBreadcrumbs());
         if (sentry.captureListener != null) {
 
@@ -405,13 +402,13 @@ public class Sentry {
         sentry.executor.execute(new Runnable() {
             @Override
             public void run() {
-                int projectId = Integer.parseInt(sentry.getProjectId());
+                int projectId = Integer.parseInt(getProjectId(sentry.dsn));
                 String url = sentry.baseUrl + "/api/" + projectId + "/store/";
 
                 log("Sending to URL - " + url);
 
                 HttpClient httpClient;
-                if (Sentry.getInstance().verifySsl != 0) {
+                if (Sentry.getInstance().verifySsl) {
                     log("Using http client");
                     httpClient = new DefaultHttpClient();
                 } else {
@@ -500,13 +497,15 @@ public class Sentry {
 
     }
 
-    private class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
+    private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
 
+        private final InternalStorage storage;
         private final UncaughtExceptionHandler defaultExceptionHandler;
 
         // constructor
-        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler) {
+        public SentryUncaughtExceptionHandler(UncaughtExceptionHandler pDefaultExceptionHandler, InternalStorage storage) {
             defaultExceptionHandler = pDefaultExceptionHandler;
+            this.storage = storage;
         }
 
         @Override
@@ -524,7 +523,7 @@ public class Sentry {
 
             if (builder != null) {
                 builder.event.put("contexts", sentry.contexts);
-                InternalStorage.getInstance().addRequest(new SentryEventRequest(builder));
+                storage.addRequest(new SentryEventRequest(builder));
             } else {
                 Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
             }
@@ -556,7 +555,7 @@ public class Sentry {
                     writeObject(context, new ArrayList<Sentry.SentryEventRequest>());
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error initializing storage", e);
             }
             this.unsentRequests = this.readObject(context);
         }
@@ -598,7 +597,7 @@ public class Sentry {
                 oos.close();
                 fos.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error saving to storage", e);
             }
         }
 
@@ -611,7 +610,7 @@ public class Sentry {
                 fis.close();
                 return requests;
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error loading from storage", e);
             }
             return new ArrayList<>();
         }
@@ -789,6 +788,16 @@ public class Sentry {
 
     }
 
+    /**
+     * The Sentry server assumes the time is in UTC.
+     * The timestamp should be in ISO 8601 format, without a timezone.
+     */
+    private static DateFormat iso8601() {
+        final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return format;
+    }
+
     public static class SentryEventBuilder implements Serializable {
 
         private static final long serialVersionUID = -8589756678369463988L;
@@ -801,11 +810,7 @@ public class Sentry {
         // dalvik.system.*
         static final String isInternalPackage = "^(java|android|com\\.android|com\\.google\\.android|dalvik\\.system)\\..*";
 
-        private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-
-        static {
-            sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-        }
+        private final static DateFormat timestampFormat = iso8601();
 
         private final Map<String, Object> event;
 
@@ -849,7 +854,7 @@ public class Sentry {
          * @return SentryEventBuilder
          */
         public SentryEventBuilder setTimestamp(long timestamp) {
-            event.put("timestamp", sdf.format(new Date(timestamp)));
+            event.put("timestamp", timestampFormat.format(new Date(timestamp)));
             return this;
         }
 
