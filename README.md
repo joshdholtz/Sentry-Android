@@ -24,6 +24,46 @@ public class MainActivity extends Activity {
 }
 ```
 
+## Features
+
+Sentry-Android has two features that make it easy to use.
+
+First, Sentry-Android will, by default, install an uncaught exception handler
+that will catch and report any uncaught exceptions (crashes) in your app. You
+only need to add a single line of code to set up Sentry-Android.
+
+Second, since Sentry-Android is written specifically for Android, we can
+automatically associate device and OS information to error-reports. The
+table below shows an example of what the data will look like in Sentry.
+
+<table>
+
+  <thead><tr><th colspan="2">DEVICE</th></tr></thead>
+  <tbody>
+    <tr><td>Family</td><td>google</td></tr>
+    <tr><td>Model</td><td>bullhead (Nexus 5X)</td></tr>
+    <tr><td>Architecture</td><td>aarch64</td></tr>
+    <tr><td>Orientation</td><td>portrait</td></tr>
+    <tr><td>screen_resolution</td><td>1794x1080</td></tr>
+  </tbody>
+
+  <thead><tr><th colspan="2">OPERATING SYSTEM</th></tr></thead>
+  <tbody>
+    <tr><td>Name</td><td>Android</td></tr>
+    <tr><td>Version</td><td>7.0 (24)</td></tr>
+    <tr><td>Kernel Version</td><td>3.10.73-g76d746e</td></tr>
+  </tbody>
+
+  <thead><tr><th colspan="2">PACKAGE</th></tr></thead>
+  <tbody>
+    <tr><td>name</td><td>com.example.package</td></tr>
+    <tr><td>version_code</td><td>210</td></tr>
+    <tr><td>version_name</td><td>2.1</td></tr>
+  </tbody>
+
+</table>
+
+
 ### Updates
 
 Version | Changes
