@@ -515,7 +515,7 @@ public class Sentry {
 
             // Here you should have a more robust, permanent record of problems
             SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventLevel.FATAL);
-            builder.setRelease(Integer.toString(sentry.appInfo.versionCode));
+            builder.setRelease(sentry.appInfo.versionName);
 
             if (sentry.captureListener != null) {
                 builder = sentry.captureListener.beforeCapture(builder);
