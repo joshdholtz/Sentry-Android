@@ -40,25 +40,25 @@ table below shows an example of what the data will look like in Sentry.
 
   <thead><tr><th colspan="2">DEVICE</th></tr></thead>
   <tbody>
-    <tr><td>Family</td><td>google</td></tr>
-    <tr><td>Model</td><td>bullhead (Nexus 5X)</td></tr>
-    <tr><td>Architecture</td><td>aarch64</td></tr>
-    <tr><td>Orientation</td><td>portrait</td></tr>
-    <tr><td>screen_resolution</td><td>1794x1080</td></tr>
+    <tr><td>Family</td><td><code>google</code></td></tr>
+    <tr><td>Model</td><td><code>bullhead (Nexus 5X)</code></td></tr>
+    <tr><td>Architecture</td><td><code>aarch64</code></td></tr>
+    <tr><td>Orientation</td><td><code>portrait</code></td></tr>
+    <tr><td>screen_resolution</td><td><code>1794x1080</code></td></tr>
   </tbody>
 
   <thead><tr><th colspan="2">OPERATING SYSTEM</th></tr></thead>
   <tbody>
-    <tr><td>Name</td><td>Android</td></tr>
-    <tr><td>Version</td><td>7.0 (24)</td></tr>
-    <tr><td>Kernel Version</td><td>3.10.73-g76d746e</td></tr>
+    <tr><td>Name</td><td><code>Android</code></td></tr>
+    <tr><td>Version</td><td><code>7.0 (24)</code></td></tr>
+    <tr><td>Kernel Version</td><td><code>3.10.73-g76d746e</code></td></tr>
   </tbody>
 
   <thead><tr><th colspan="2">PACKAGE</th></tr></thead>
   <tbody>
-    <tr><td>name</td><td>com.example.package</td></tr>
-    <tr><td>version_code</td><td>210</td></tr>
-    <tr><td>version_name</td><td>2.1</td></tr>
+    <tr><td>name</td><td><code>com.example.package</code></td></tr>
+    <tr><td>version_code</td><td><code>210</code></td></tr>
+    <tr><td>version_name</td><td><code>2.1</code></td></tr>
   </tbody>
 
 </table>
