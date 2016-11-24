@@ -12,6 +12,8 @@ Below is an example of how to register Sentry-Android to handle uncaught excepti
 ```
 
 ``` java
+import com.joshdholtz.sentry.Sentry;
+
 public class MainActivity extends Activity {
 
     @Override
