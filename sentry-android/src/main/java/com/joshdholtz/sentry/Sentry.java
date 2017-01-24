@@ -75,6 +75,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -97,7 +99,7 @@ public class Sentry {
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
-    private LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
+    private final Breadcrumbs breadcrumbs = new Breadcrumbs();
 
     public enum SentryEventLevel {
 
@@ -308,9 +310,8 @@ public class Sentry {
         final SentryEventRequest request;
         builder.event.put("contexts", sentry.contexts);
         builder.setRelease(sentry.appInfo.versionName);
-        builder.event.put("breadcrumbs", Sentry.getInstance().currentBreadcrumbs());
+        builder.event.put("breadcrumbs", Sentry.getInstance().breadcrumbs.current());
         if (sentry.captureListener != null) {
-
 
             builder = sentry.captureListener.beforeCapture(builder);
             if (builder == null) {
@@ -653,11 +654,48 @@ public class Sentry {
         }
     }
 
-    private void pushBreadcrumb(Breadcrumb b) {
-        while (breadcrumbs.size() >= MAX_BREADCRUMBS) {
-            breadcrumbs.removeFirst();
+    private static class Breadcrumbs {
+
+        // Access to this list must be thread-safe.
+        // See GitHub Issue #110
+        // This list is protected by the provided ReadWriteLock.
+        private final LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
+        private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
+        void push(Breadcrumb b) {
+            try {
+                lock.writeLock().lock();
+                while (breadcrumbs.size() >= MAX_BREADCRUMBS) {
+                    breadcrumbs.removeFirst();
+                }
+                breadcrumbs.add(b);
+            } finally {
+                lock.writeLock().unlock();
+            }
         }
-        breadcrumbs.add(b);
+
+        JSONArray current() {
+            final JSONArray crumbs = new JSONArray();
+            try {
+                lock.readLock().lock();
+                for (Breadcrumb breadcrumb : breadcrumbs) {
+                    final JSONObject json = new JSONObject();
+                    json.put("timestamp", breadcrumb.timestamp);
+                    json.put("type", breadcrumb.type.value);
+                    json.put("message", breadcrumb.message);
+                    json.put("category", breadcrumb.category);
+                    json.put("level", breadcrumb.level.value);
+                    json.put("data", new JSONObject(breadcrumb.data));
+                    crumbs.put(json);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error serializing breadcrumbs", e);
+            } finally {
+                lock.readLock().unlock();
+            }
+            return crumbs;
+        }
+
     }
 
     /**
@@ -679,7 +717,7 @@ public class Sentry {
 
         b.data.put("from", from);
         b.data.put("to", to);
-        getInstance().pushBreadcrumb(b);
+        getInstance().breadcrumbs.push(b);
     }
 
     /**
@@ -706,7 +744,7 @@ public class Sentry {
         b.data.put("method", method);
         b.data.put("status_code", Integer.toString(statusCode));
         b.data.put("reason", reason);
-        getInstance().pushBreadcrumb(b);
+        getInstance().breadcrumbs.push(b);
     }
 
     /**
@@ -725,31 +763,12 @@ public class Sentry {
      *
      */
     public static void addBreadcrumb(String category, String message) {
-        getInstance().pushBreadcrumb(new Breadcrumb(
+        getInstance().breadcrumbs.push(new Breadcrumb(
             System.currentTimeMillis() / 1000,
             Breadcrumb.Type.Default,
             message,
             category,
             SentryEventLevel.INFO));
-    }
-
-    private JSONArray currentBreadcrumbs() {
-        final JSONArray crumbs = new JSONArray();
-        for (Breadcrumb breadcrumb : breadcrumbs) {
-            final JSONObject json = new JSONObject();
-            try {
-                json.put("timestamp", breadcrumb.timestamp);
-                json.put("type", breadcrumb.type.value);
-                json.put("message", breadcrumb.message);
-                json.put("category", breadcrumb.category);
-                json.put("level", breadcrumb.level.value);
-                json.put("data", new JSONObject(breadcrumb.data));
-            } catch (JSONException jse) {
-                Log.e(TAG, "Error serializing breadcrumbs", jse);
-            }
-            crumbs.put(json);
-        }
-        return crumbs;
     }
 
     public static class SentryEventRequest implements Serializable {
