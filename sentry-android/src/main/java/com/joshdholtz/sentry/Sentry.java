@@ -82,6 +82,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 public class Sentry {
 
     private static final String TAG = "Sentry";
@@ -419,7 +421,7 @@ public class Sentry {
 
                 HttpPost httpPost = new HttpPost(url);
 
-                int TIMEOUT_MILLISEC = 10000;  // = 20 seconds
+                int TIMEOUT_MILLISEC = (int)SECONDS.toMillis(10);
                 HttpParams httpParams = httpPost.getParams();
                 HttpConnectionParams.setConnectionTimeout(httpParams, TIMEOUT_MILLISEC);
                 HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
