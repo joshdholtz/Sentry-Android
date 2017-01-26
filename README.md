@@ -93,7 +93,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.5.0'
+compile 'com.joshdholtz.sentry:sentry-android:1.5.1'
 ```
 
 ### Manual
