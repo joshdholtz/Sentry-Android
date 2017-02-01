@@ -13,48 +13,21 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.WindowManager;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.EnglishReasonPhraseCatalog;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
-import org.apache.http.protocol.HTTP;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.net.Socket;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.text.DateFormat;
@@ -78,7 +51,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -176,28 +152,20 @@ public class Sentry {
 
         return new ThreadPoolExecutor(
             0, 1, // Keep 0 threads alive. Max pool size is 1.
-            60, TimeUnit.SECONDS, // Kill unused threads after this length.
+            60, SECONDS, // Kill unused threads after this length.
             new ArrayBlockingQueue<Runnable>(queueSize),
             threadFactory, new ThreadPoolExecutor.DiscardPolicy()); // Discard exceptions
     }
 
     private static boolean getVerifySsl(String dsn) {
-        List<NameValuePair> params = getAllGetParams(dsn);
-        for (NameValuePair param : params) {
-            if (param.getName().equals("verify_ssl"))
-                return Integer.parseInt(param.getValue()) != 0;
-        }
-        return false;
-    }
-
-    private static List<NameValuePair> getAllGetParams(String dsn) {
-        List<NameValuePair> params = null;
         try {
-            params = URLEncodedUtils.parse(new URI(dsn), HTTP.UTF_8);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
+            final Uri uri = Uri.parse(dsn);
+            final String value = uri.getQueryParameter("verify_ssl");
+            return value == null || Integer.parseInt(value) != 0;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not parse verify_ssl correctly", e);
+            return true;
         }
-        return params;
     }
 
     private void setupUncaughtExceptionHandler() {
@@ -238,9 +206,7 @@ public class Sentry {
 
     private static String getProjectId(Uri dsn) {
         String path = dsn.getPath();
-        String projectId = path.substring(path.lastIndexOf("/") + 1);
-
-        return projectId;
+        return path.substring(path.lastIndexOf("/") + 1);
     }
 
     public static void sendAllCachedCapturedEvents() {
@@ -319,13 +285,11 @@ public class Sentry {
                 Log.e(Sentry.TAG, "SentryEventBuilder in captureEvent is null");
                 return;
             }
-
-            request = new SentryEventRequest(builder);
-        } else {
-            request = new SentryEventRequest(builder);
         }
 
-        log("Request - " + request.getRequestData());
+        request = new SentryEventRequest(builder);
+
+        log("Request - " + request.requestData);
 
         doCaptureEventPost(request);
     }
@@ -342,28 +306,16 @@ public class Sentry {
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 
-    private static class ExSSLSocketFactory extends SSLSocketFactory {
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-
-        ExSSLSocketFactory(SSLContext context) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
-            super(null);
-            sslContext = context;
-        }
-
-        @Override
-        public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
-            return sslContext.getSocketFactory().createSocket(socket, host, port, autoClose);
-        }
-
-        @Override
-        public Socket createSocket() throws IOException {
-            return sslContext.getSocketFactory().createSocket();
-        }
-    }
-
-    private static HttpClient getHttpsClient(HttpClient client) {
+    private static void ignoreSslErrors(HttpURLConnection connection) {
         try {
-            X509TrustManager x509TrustManager = new X509TrustManager() {
+
+            if (!(connection instanceof HttpsURLConnection)) {
+                return;
+            }
+
+            final HttpsURLConnection https = (HttpsURLConnection) connection;
+
+            final X509TrustManager x509TrustManager = new X509TrustManager() {
                 @Override
                 public void checkClientTrusted(X509Certificate[] chain,
                                                String authType) throws CertificateException {
@@ -382,16 +334,71 @@ public class Sentry {
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, new TrustManager[]{x509TrustManager}, null);
-            SSLSocketFactory sslSocketFactory = new ExSSLSocketFactory(sslContext);
-            sslSocketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-            ClientConnectionManager clientConnectionManager = client.getConnectionManager();
-            SchemeRegistry schemeRegistry = clientConnectionManager.getSchemeRegistry();
-            schemeRegistry.register(new Scheme("https", sslSocketFactory, 443));
-            return new DefaultHttpClient(clientConnectionManager, client.getParams());
+
+            https.setSSLSocketFactory(sslContext.getSocketFactory());
+
+            https.setHostnameVerifier(new HostnameVerifier() {
+                public boolean verify(String host, SSLSession sess) {
+                    return true;
+                }
+            });
+
         } catch (Exception ex) {
-            return null;
+            Log.w(TAG, "Error bypassing SSL validation", ex);
         }
     }
+
+    private Runnable makePoster(final SentryEventRequest request) {
+
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int projectId = Integer.parseInt(getProjectId(dsn));
+                    URL url = new URL(baseUrl + "/api/" + projectId + "/store/");
+
+                    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+                    if (!verifySsl) {
+                        ignoreSslErrors(conn);
+                    }
+
+                    final int timeoutMillis = (int)SECONDS.toMillis(10);
+
+                    conn.setConnectTimeout(timeoutMillis);
+                    conn.setReadTimeout(timeoutMillis);
+                    conn.setDoOutput(true);
+                    conn.setDoInput(false);
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("X-Sentry-Auth", createXSentryAuthHeader(dsn));
+                    conn.setRequestProperty("User-Agent", "sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION);
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+
+                    OutputStream os = conn.getOutputStream();
+                    os.write(request.requestData.getBytes("UTF-8"));
+                    os.close();
+
+                    final int status = conn.getResponseCode();
+                    final boolean success = status == 200;
+
+                    conn.disconnect();
+
+                    log("SendEvent status=" + status);
+
+                    if (success) {
+                        InternalStorage.getInstance().removeBuilder(request);
+                    } else {
+                        InternalStorage.getInstance().addRequest(request);
+                    }
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error sending event", e);
+                }
+            }
+        };
+
+    }
+
 
     private static void doCaptureEventPost(final SentryEventRequest request) {
         final Sentry sentry = Sentry.getInstance();
@@ -401,102 +408,7 @@ public class Sentry {
             return;
         }
 
-        sentry.executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                int projectId = Integer.parseInt(getProjectId(sentry.dsn));
-                String url = sentry.baseUrl + "/api/" + projectId + "/store/";
-
-                log("Sending to URL - " + url);
-
-                HttpClient httpClient;
-                if (Sentry.getInstance().verifySsl) {
-                    log("Using http client");
-                    httpClient = new DefaultHttpClient();
-                } else {
-                    log("Using https client");
-                    httpClient = getHttpsClient(new DefaultHttpClient());
-                }
-
-                HttpPost httpPost = new HttpPost(url);
-
-                int TIMEOUT_MILLISEC = (int)SECONDS.toMillis(10);
-                HttpParams httpParams = httpPost.getParams();
-                HttpConnectionParams.setConnectionTimeout(httpParams, TIMEOUT_MILLISEC);
-                HttpConnectionParams.setSoTimeout(httpParams, TIMEOUT_MILLISEC);
-
-                HttpProtocolParams.setContentCharset(httpParams, HTTP.UTF_8);
-                HttpProtocolParams.setHttpElementCharset(httpParams, HTTP.UTF_8);
-
-                boolean success = false;
-                try {
-                    httpPost.setHeader("X-Sentry-Auth", createXSentryAuthHeader(sentry.dsn));
-                    httpPost.setHeader("User-Agent", "sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION);
-                    httpPost.setHeader("Content-Type", "application/json; charset=utf-8");
-
-                    httpPost.setEntity(new StringEntity(request.getRequestData(), HTTP.UTF_8));
-                    HttpResponse httpResponse = httpClient.execute(httpPost);
-
-                    int status = httpResponse.getStatusLine().getStatusCode();
-                    byte[] byteResp = null;
-
-                    // Gets the input stream and unpackages the response into a command
-                    if (httpResponse.getEntity() != null) {
-                        try {
-                            InputStream in = httpResponse.getEntity().getContent();
-                            byteResp = this.readBytes(in);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    String stringResponse = null;
-                    Charset charsetInput = Charset.forName("UTF-8");
-                    CharsetDecoder decoder = charsetInput.newDecoder();
-                    CharBuffer cbuf = null;
-                    try {
-                        cbuf = decoder.decode(ByteBuffer.wrap(byteResp));
-                        stringResponse = cbuf.toString();
-                    } catch (CharacterCodingException e) {
-                        e.printStackTrace();
-                    }
-
-                    success = (status == 200);
-
-                    log("SendEvent - " + status + " " + stringResponse);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                if (success) {
-                    InternalStorage.getInstance().removeBuilder(request);
-                } else {
-                    InternalStorage.getInstance().addRequest(request);
-                }
-            }
-
-            private byte[] readBytes(InputStream inputStream) throws IOException {
-                // this dynamically extends to take the bytes you read
-                ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
-
-                // this is storage overwritten on each iteration with bytes
-                int bufferSize = 1024;
-                byte[] buffer = new byte[bufferSize];
-
-                // we need to know how may bytes were read to write them to the byteBuffer
-                int len = 0;
-                while ((len = inputStream.read(buffer)) != -1) {
-                    byteBuffer.write(buffer, 0, len);
-                }
-
-                // and then we can return your byte array.
-                return byteBuffer.toByteArray();
-            }
-
-        });
-
-
+        sentry.executor.execute(sentry.makePoster(request));
     }
 
     private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
@@ -531,7 +443,7 @@ public class Sentry {
                 Log.e(Sentry.TAG, "SentryEventBuilder in uncaughtException is null");
             }
 
-            //call original handler
+            // Call original handler
             defaultExceptionHandler.uncaughtException(thread, e);
         }
 
@@ -738,7 +650,7 @@ public class Sentry {
      * @see com.joshdholtz.sentry.Sentry#addHttpBreadcrumb(String, String, int)
      */
     public static void addHttpBreadcrumb(String url, String method, int statusCode) {
-        final String reason = EnglishReasonPhraseCatalog.INSTANCE.getReason(statusCode, Locale.US);
+        final String reason = httpReason(statusCode);
         final Breadcrumb b = new Breadcrumb(
             System.currentTimeMillis() / 1000,
             Breadcrumb.Type.HTTP,
@@ -777,38 +689,19 @@ public class Sentry {
             SentryEventLevel.INFO));
     }
 
-    public static class SentryEventRequest implements Serializable {
-        private final String requestData;
-        private final UUID uuid;
+    private static class SentryEventRequest implements Serializable {
+        final String requestData;
+        final UUID uuid;
 
-        public SentryEventRequest(SentryEventBuilder builder) {
+        SentryEventRequest(SentryEventBuilder builder) {
             this.requestData = new JSONObject(builder.event).toString();
             this.uuid = UUID.randomUUID();
         }
 
-        /**
-         * @return the requestData
-         */
-        public String getRequestData() {
-            return requestData;
-        }
-
-        /**
-         * @return the uuid
-         */
-        public UUID getUuid() {
-            return uuid;
-        }
-
         @Override
         public boolean equals(Object other) {
-            SentryEventRequest otherRequest = (SentryEventRequest) other;
-
-            if (this.uuid != null && otherRequest.uuid != null) {
-                return uuid.equals(otherRequest.uuid);
-            }
-
-            return false;
+            final boolean sameClass = other instanceof SentryEventRequest;
+            return sameClass && uuid == ((SentryEventRequest) other).uuid;
         }
 
     }
@@ -1280,6 +1173,62 @@ public class Sentry {
             Log.e(TAG, "Error reading package context", e);
         }
         return pack;
+    }
+
+    /**
+     * Map from HTTP status code to reason description.
+     * Sentry HTTP breadcrumbs expect a text description of the HTTP status-code.
+     * This function implements a look-up table with a default value for unknown status-codes.
+     * @param statusCode an integer HTTP status code, expected to be in the range [200,505].
+     * @return a non-empty string in all cases.
+     */
+    private static String httpReason(int statusCode) {
+        switch (statusCode) {
+            // 2xx
+            case HttpURLConnection.HTTP_OK: return "OK";
+            case HttpURLConnection.HTTP_CREATED: return "Created";
+            case HttpURLConnection.HTTP_ACCEPTED: return "Accepted";
+            case HttpURLConnection.HTTP_NOT_AUTHORITATIVE: return "Non-Authoritative Information";
+            case HttpURLConnection.HTTP_NO_CONTENT: return "No Content";
+            case HttpURLConnection.HTTP_RESET: return "Reset Content";
+            case HttpURLConnection.HTTP_PARTIAL: return "Partial Content";
+
+            // 3xx
+            case HttpURLConnection.HTTP_MULT_CHOICE: return "Multiple Choices";
+            case HttpURLConnection.HTTP_MOVED_PERM: return "Moved Permanently";
+            case HttpURLConnection.HTTP_MOVED_TEMP: return "Temporary Redirect";
+            case HttpURLConnection.HTTP_SEE_OTHER: return "See Other";
+            case HttpURLConnection.HTTP_NOT_MODIFIED: return "Not Modified";
+            case HttpURLConnection.HTTP_USE_PROXY: return "Use Proxy";
+
+            // 4xx
+            case HttpURLConnection.HTTP_BAD_REQUEST: return "Bad Request";
+            case HttpURLConnection.HTTP_UNAUTHORIZED: return "Unauthorized";
+            case HttpURLConnection.HTTP_PAYMENT_REQUIRED: return "Payment Required";
+            case HttpURLConnection.HTTP_FORBIDDEN: return "Forbidden";
+            case HttpURLConnection.HTTP_NOT_FOUND: return "Not Found";
+            case HttpURLConnection.HTTP_BAD_METHOD: return "Method Not Allowed";
+            case HttpURLConnection.HTTP_NOT_ACCEPTABLE: return "Not Acceptable";
+            case HttpURLConnection.HTTP_PROXY_AUTH: return "Proxy Authentication Required";
+            case HttpURLConnection.HTTP_CLIENT_TIMEOUT: return "Request Time-Out";
+            case HttpURLConnection.HTTP_CONFLICT: return "Conflict";
+            case HttpURLConnection.HTTP_GONE: return "Gone";
+            case HttpURLConnection.HTTP_LENGTH_REQUIRED: return "Length Required";
+            case HttpURLConnection.HTTP_PRECON_FAILED: return "Precondition Failed";
+            case HttpURLConnection.HTTP_ENTITY_TOO_LARGE: return "Request Entity Too Large";
+            case HttpURLConnection.HTTP_REQ_TOO_LONG: return "Request-URI Too Large";
+            case HttpURLConnection.HTTP_UNSUPPORTED_TYPE: return "Unsupported Media Type";
+
+            // 5xx
+            case HttpURLConnection.HTTP_INTERNAL_ERROR: return "Internal Server Error";
+            case HttpURLConnection.HTTP_NOT_IMPLEMENTED: return "Not Implemented";
+            case HttpURLConnection.HTTP_BAD_GATEWAY: return "Bad Gateway";
+            case HttpURLConnection.HTTP_UNAVAILABLE: return "Service Unavailable";
+            case HttpURLConnection.HTTP_GATEWAY_TIMEOUT: return "Gateway Timeout";
+            case HttpURLConnection.HTTP_VERSION: return "Version Not Supported";
+
+            default: return "unknown";
+        }
     }
 
     /**
