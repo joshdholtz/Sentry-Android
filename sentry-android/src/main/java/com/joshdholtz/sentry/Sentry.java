@@ -89,7 +89,6 @@ public class Sentry {
     private static final String TAG = "Sentry";
     private final static String sentryVersion = "7";
     private static final int MAX_QUEUE_LENGTH = 50;
-    private static final int MAX_BREADCRUMBS = 10;
 
     public static boolean debug = false;
 
@@ -519,6 +518,7 @@ public class Sentry {
             // Here you should have a more robust, permanent record of problems
             SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventLevel.FATAL);
             builder.setRelease(sentry.appInfo.versionName);
+            builder.event.put("breadcrumbs", sentry.breadcrumbs.current());
 
             if (sentry.captureListener != null) {
                 builder = sentry.captureListener.beforeCapture(builder);
@@ -657,6 +657,10 @@ public class Sentry {
     }
 
     private static class Breadcrumbs {
+
+        // The max number of breadcrumbs that will be tracked at any one time.
+        private static final int MAX_BREADCRUMBS = 10;
+
 
         // Access to this list must be thread-safe.
         // See GitHub Issue #110
