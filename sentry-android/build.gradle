@@ -1,17 +1,23 @@
-group = 'com.joshdholtz.sentry'
-version = '1.4.2-finanteq'
+plugins {
+    id "com.jfrog.bintray" version "1.7"
+}
+
 apply plugin: 'com.android.library'
-apply plugin: 'com.github.dcendents.android-maven'
+
+
+def SentryAndroidVersion = "1.5.4-finanteq"
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion 25
+    buildToolsVersion "25.0.3"
 
     defaultConfig {
         minSdkVersion 5
-        targetSdkVersion 23
+        targetSdkVersion 25
         versionCode 1
         versionName "1.0"
+
+        buildConfigField "String", "SENTRY_ANDROID_VERSION", "\"${SentryAndroidVersion}\""
     }
     buildTypes {
         release {
@@ -23,6 +29,7 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestCompile 'com.google.guava:guava:19.0'
 }
 
 ext {

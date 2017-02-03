@@ -5,12 +5,8 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.1.2'
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
-
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.4'
-        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.3'
+        classpath 'com.android.tools.build:gradle:2.2.3'
+        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.4.1'
     }
 }
 
@@ -21,27 +17,5 @@ allprojects {
         maven {
             url 'https://dl.bintray.com/joshdholtz/maven/'
         }
-    }
-
-
-    ext {
-        bintrayRepo = 'maven'
-        bintrayName = 'sentry-android'
-
-        publishedGroupId = 'com.joshdholtz.sentry'
-
-
-        siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
-        gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
-
-        libraryVersion = '1.4.2-finanteq'
-
-        developerId = 'joshdholtz'
-        developerName = 'Josh Holtz'
-        developerEmail = 'josh@rokkincat.com'
-
-        licenseName = 'The MIT License (MIT)'
-        licenseUrl = 'http://opensource.org/licenses/mit-license.php'
-        allLicenses = ["MIT"]
     }
 }

@@ -12,25 +12,71 @@ Below is an example of how to register Sentry-Android to handle uncaught excepti
 ```
 
 ``` java
+import com.joshdholtz.sentry.Sentry;
+
 public class MainActivity extends Activity {
 
-	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-		// Sentry will look for uncaught exceptions from previous runs and send them		
-		Sentry.init(this.getApplicationContext(), "YOUR-SENTRY-DSN");
-
-	}
-
+        // Sentry will look for uncaught exceptions from previous runs and send them
+        Sentry.init(this, "YOUR-SENTRY-DSN");
+    }
 }
 ```
+
+## Features
+
+Sentry-Android has two features that make it easy to use.
+
+First, Sentry-Android will, by default, install an uncaught exception handler
+that will catch and report any uncaught exceptions (crashes) in your app. You
+only need to add a single line of code to set up Sentry-Android.
+
+Second, since Sentry-Android is written specifically for Android, we can
+automatically associate device and OS information to error-reports. The
+table below shows an example of what the data will look like in Sentry.
+
+<table>
+
+  <thead><tr><th colspan="2">DEVICE</th></tr></thead>
+  <tbody>
+    <tr><td>Family</td><td><code>google</code></td></tr>
+    <tr><td>Model</td><td><code>bullhead (Nexus 5X)</code></td></tr>
+    <tr><td>Architecture</td><td><code>aarch64</code></td></tr>
+    <tr><td>Orientation</td><td><code>portrait</code></td></tr>
+    <tr><td>screen_resolution</td><td><code>1794x1080</code></td></tr>
+  </tbody>
+
+  <thead><tr><th colspan="2">OPERATING SYSTEM</th></tr></thead>
+  <tbody>
+    <tr><td>Name</td><td><code>Android</code></td></tr>
+    <tr><td>Version</td><td><code>7.0 (24)</code></td></tr>
+    <tr><td>Kernel Version</td><td><code>3.10.73-g76d746e</code></td></tr>
+  </tbody>
+
+  <thead><tr><th colspan="2">PACKAGE</th></tr></thead>
+  <tbody>
+    <tr><td>name</td><td><code>com.example.package</code></td></tr>
+    <tr><td>version_code</td><td><code>210</code></td></tr>
+    <tr><td>version_name</td><td><code>2.1</code></td></tr>
+  </tbody>
+
+</table>
+
 
 ### Updates
 
 Version | Changes
 --- | ---
+**1.5.4** | Ensure that breadcrumbs are added to all exceptions. [#115](https://github.com/joshdholtz/Sentry-Android/issues/115).
+**1.5.3** | Fix thread-safety bug when serializing breadcrumbs. [#110](https://github.com/joshdholtz/Sentry-Android/issues/110) (thanks to [fab1an](https://github.com/fab1an)).
+**1.5.2** | Send stack-frames to Sentry in the correct order. [#95](https://github.com/joshdholtz/Sentry-Android/pull/95).<br/> Use the [versionName](https://developer.android.com/studio/publish/versioning.html#appversioning), rather than versionCode, as the default value for the release field of events (thanks to [FelixBondarenko](https://github.com/FelixBondarenko)).
+**1.5.1** | Revert accidental API removal of `captureException(Throwable, SentryEventLevel)`.
+**1.5.0** | Add Breadcrumb support [#70](https://github.com/joshdholtz/Sentry-Android/pull/70).<br/>Add release tracking by default [#78](https://github.com/joshdholtz/Sentry-Android/pull/78).<br/>Add the ability to attach a stack-trace to any event [#81](https://github.com/joshdholtz/Sentry-Android/issues/81).<br/>Use a fixed-size thread-pool for sending events [#80](https://github.com/joshdholtz/Sentry-Android/pull/80).<br/>Make it easier to add a message when capturing an exception [#77](https://github.com/joshdholtz/Sentry-Android/pull/77).<br/>Added helper methods for addExtra and addTag [#74](https://github.com/joshdholtz/Sentry-Android/pull/74).<br/>(thanks to [marcomorain](https://github.com/marcomorain))
+**1.4.4** | Sends up device, app, and OS context by default (thanks to [marcomorain](https://github.com/marcomorain))
+**1.4.3** | Fixes for a Google Play warning and added option to not use crash reporting (thanks to [ZeroStride](https://github.com/ZeroStride))
 **1.4.1** | Fixes for a potential memory leak and a crash (thanks to [Syhids](https://github.com/Syhids) and [woostrowski](https://github.com/woostrowski))
 **1.4.0** | Fixes issues when using self-hosted Sentry server
 **1.2.1** | Sends up data to Sentry as UTF-8
@@ -48,7 +94,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.4.1'
+compile 'com.joshdholtz.sentry:sentry-android:1.5.0'
 ```
 
 ### Manual
@@ -77,7 +123,7 @@ Sentry.captureMessage("Something significant may have happened");
 ``` java
 try {
 	JSONObject obj = new JSONObject();
-} catch (JSONException e) { 
+} catch (JSONException e) {
 	Sentry.captureException(e);
 }
 ```
@@ -91,29 +137,51 @@ Sentry.captureEvent(new Sentry.SentryEventBuilder()
 );
 ```
 
+### Capture Breadcrumbs
+You can record [breadcrumbs](https://docs.sentry.io/hosted/learn/breadcrumbs/) to
+track what happened in your application leading up to an error.
+
+There are 3 ways to log a breadcrumb.
+
+```java
+// Record that a user sent a HTTP POST to example.com and it was successful.
+Sentry.addHttpBreadcrumb("http://example.com", "POST", 200);
+
+// Record the fact that user clicked a button to go from the main menu to the
+// settings menu.
+Sentry.addNavigationBreadcrumb("user.click", "main menu", "settings");
+
+// Record a general,  application specific event
+Sentry.addBreadcrumb("user.state_change", "logged in");
+```
+
+
+### Release Tracking
+
+The SDK will automatically tag events with [a release](https://docs.sentry.io/hosted/api/releases/post-project-releases/).
+The release is set to the app's [`versionName` by default](https://developer.android.com/studio/publish/versioning.html#appversioning).
+You can override the `release` easily by using the `setRelease(String release)`
+function from inside a `SentryEventCaptureListener`.
+
 ### Set a listener to intercept the SentryEventBuilder before each capture
 ``` java
 // CALL THIS BEFORE CALLING Sentry.init
-// Sets a listener to intercept the SentryEventBuilder before 
+// Sets a listener to intercept the SentryEventBuilder before
 // each capture to set values that could change state
 Sentry.setCaptureListener(new SentryEventCaptureListener() {
 
-	@Override
-	public SentryEventBuilder beforeCapture(SentryEventBuilder builder) {
-		
-		// Needs permission - <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-		ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-		NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+    @Override
+    public SentryEventBuilder beforeCapture(SentryEventBuilder builder) {
 
-		// Sets extra key if wifi is connected
-		try {
-			builder.getExtra().put("wifi", String.valueOf(mWifi.isConnected()));
-			builder.getTags().put("tag_1", "value_1");
-		} catch (JSONException e) {}
-		
-		return builder;
-	}
-	
+        // Needs permission - <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+        // Sets extra key if wifi is connected
+        return builder
+            .addExtra("wifi", String.valueOf(mWifi.isConnected()))
+            .addTag("tag_1", "value_1");
+    }
 });
 
 ```
@@ -133,4 +201,4 @@ Twitter: [@joshdholtz](http://twitter.com/joshdholtz)
 
 ## License
 
-Sentry-Android is available under the MIT license. See the LICENSE file for more info.
+Sentry-Android is available under the [MIT license](LICENSE).
