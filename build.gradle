@@ -18,4 +18,32 @@ allprojects {
             url 'https://dl.bintray.com/joshdholtz/maven/'
         }
     }
+
+    ext {
+        bintrayRepo = 'maven'
+        bintrayName = 'sentry-android'
+
+        publishedGroupId = 'com.joshdholtz.sentry'
+
+
+        siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
+        gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
+
+        libraryVersion = '1.5.5'
+
+        developerId = 'joshdholtz'
+        developerName = 'Josh Holtz'
+        developerEmail = 'josh@rokkincat.com'
+
+        licenseName = 'The MIT License (MIT)'
+        licenseUrl = 'http://opensource.org/licenses/mit-license.php'
+        allLicenses = ["MIT"]
+
+        ext_compileSdkVersion = 25
+        ext_buildToolsVersion  = "25.0.2"
+
+        ext_minSdkVersion = 10
+        ext_targetSdkVersion = 25
+    }
+
 }

@@ -1,17 +1,20 @@
 apply plugin: 'com.android.library'
 
+
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion ext_compileSdkVersion
+    buildToolsVersion ext_buildToolsVersion
 
     useLibrary 'org.apache.http.legacy'
 
+
     defaultConfig {
-        minSdkVersion 3
-        targetSdkVersion 23
+        minSdkVersion ext_minSdkVersion
+        targetSdkVersion ext_targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -28,5 +31,7 @@ ext {
 
 dependencies {
     provided 'org.jbundle.util.osgi.wrapped:org.jbundle.util.osgi.wrapped.org.apache.http.client:4.1.2'
-    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+//    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+    compile project(":sentry-android")
+
 }

@@ -7,6 +7,7 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.joshdholtz.sentry.Sentry;
+import com.joshdholtz.sentry.SentryInstance;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -15,20 +16,19 @@ import java.util.concurrent.Executors;
 public class MainActivity extends AppCompatActivity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private Sentry sentry;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        String yourDSN = "your-dsn";
-        Sentry.init(this, yourDSN);
-        Sentry.debug = true;
+        sentry = SentryInstance.getInstance();
 
-        Sentry.addNavigationBreadcrumb("activity.main", "here", "there");
-        Sentry.addHttpBreadcrumb("http://example.com", "GET", 202);
+        sentry.addNavigationBreadcrumb("activity.main", "here", "there");
+        sentry.addHttpBreadcrumb("http://example.com", "GET", 202);
 
-        Sentry.captureEvent(new Sentry.SentryEventBuilder()
+        sentry.captureEvent(sentry.newEventBuilder()
             .setMessage("OMG this works woooo")
             .setStackTrace(Thread.currentThread().getStackTrace())
         );
@@ -57,17 +57,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClickBreak(View view) {
-        Sentry.addBreadcrumb("button.click", "break button");
+        sentry.addBreadcrumb("button.click", "break button");
         crash();
 
     }
 
     public void onClickCapture(View view) {
-        Sentry.addBreadcrumb("button.click", "capture button");
+        sentry.addBreadcrumb("button.click", "capture button");
         try {
             crash();
         } catch (Exception e) {
-            Sentry.captureException(e, "Exception caught in click handler");
+            sentry.captureException(e, "Exception caught in click handler");
         }
     }
 

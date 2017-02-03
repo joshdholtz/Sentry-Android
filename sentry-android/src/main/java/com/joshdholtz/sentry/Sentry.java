@@ -1,5 +1,7 @@
 package com.joshdholtz.sentry;
 
+import android.Manifest;
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -7,8 +9,8 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
-import android.util.Pair;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,22 +27,33 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class Sentry {
 
-    private static final String TAG = "Sentry";
-    private static final String VERSION = "0.2.0";
+    static final String TAG = "Sentry";
+    private static final int MAX_QUEUE_LENGTH = 50;
     private static final String VERIFY_SSL = "verify_ssl";
     private static final String MEDIA_TYPE = "application/json; charset=utf-8";
     private static final int HTTP_OK = 200;
@@ -51,13 +64,13 @@ public final class Sentry {
     private Context context;
     private String sentryVersion = "7";
     private String url;
-    private Uri dsn;
-    private Pair<String,String> credentials;
     private String packageName;
+    private final String publicKey;
+    private final String secretKey;
     private int verifySsl;
     private SentryEventCaptureListener captureListener;
     private HttpRequestSender httpRequestSender;
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private ExecutorService executorService = fixedQueueDiscardingExecutor();
     private InternalStorage internalStorage;
     private Runnable sendUnsentRequests = new Runnable() {
         @Override
@@ -71,12 +84,13 @@ public final class Sentry {
     };
     private boolean enableDebugLogging;
     private SentryUncaughtExceptionHandler uncaughtExceptionHandler;
+    private final Breadcrumbs breadcrumbs = new Breadcrumbs();
 
-    private Sentry(Context applicationContext, Uri dsnUri, String url, Pair<String, String> credentials, int verifySsl, String storageFileName, HttpRequestSender httpRequestSender) {
+    private Sentry(Context applicationContext, String url, String publicKey,String secretKey, int verifySsl, String storageFileName, HttpRequestSender httpRequestSender) {
         context = applicationContext;
-        dsn = dsnUri;
         this.url = url;
-        this.credentials = credentials;
+        this.publicKey = publicKey;
+        this.secretKey = secretKey;
         this.verifySsl = verifySsl;
         this.httpRequestSender = httpRequestSender;
         packageName = applicationContext.getPackageName();
@@ -84,19 +98,20 @@ public final class Sentry {
     }
 
     /**
-     * This method returns new {@code Sentry} instance which can operate separately with other instances. Should be called once, usually in {@link Application#onCreate()} and obtained from some singleton. If you have only one instance than you can use {@link SentryInstance}. In {@link android.app.Activity#onCreate(Bundle)} you should call at least {@link #sendAllCachedCapturedEvents()} to try to send cached events
+     * This method returns new {@code Sentry} instance which can operate separately with other instances. Should be called once, usually in {@link Application#onCreate()} and obtained from some singleton. If you have only one instance than you can use {@link SentryInstance}. In {@link Activity#onCreate(Bundle)} you should call at least {@link #sendAllCachedCapturedEvents()} to try to send cached events
      *
-     * @param context           this can be any context because {@link Context#getApplicationContext()} is used to avoid memory leak
-     * @param dsnWithoutCredentials               DSN of your project - remove credentials from it to avoid warning in Google Play console
-     * @param httpRequestSender used for sending events to Sentry server
-     * @param storageFileName   unsent requests storage file - must be different for different instances
-     * @param credentials  credentials from DSN
+     * @param context               this can be any context because {@link Context#getApplicationContext()} is used to avoid memory leak
+     * @param dsnWithoutCredentials DSN of your project - remove credentials from it to avoid warning in Google Play console
+     * @param httpRequestSender     used for sending events to Sentry server
+     * @param storageFileName       unsent requests storage file - must be different for different instances
+     * @param publicKey           public key from DSN
+     * @param secretKey           secret key from DSN
      * @return new {@code Sentry} instance
      */
-    public static Sentry newInstance(Context context, String dsnWithoutCredentials, HttpRequestSender httpRequestSender, String storageFileName, Pair<String, String> credentials) {
+    public static Sentry newInstance(Context context, String dsnWithoutCredentials, HttpRequestSender httpRequestSender, String storageFileName, String publicKey,String secretKey) {
         Uri dsnUri = Uri.parse(dsnWithoutCredentials);
 
-        Sentry sentry = new Sentry(context.getApplicationContext(), dsnUri, getUrl(dsnUri), credentials, getVerifySsl(dsnUri), storageFileName, httpRequestSender);
+        Sentry sentry = new Sentry(context.getApplicationContext(), getUrl(dsnUri), publicKey, secretKey, getVerifySsl(dsnUri), storageFileName, httpRequestSender);
         sentry.setupUncaughtExceptionHandler();
         return sentry;
     }
@@ -111,6 +126,26 @@ public final class Sentry {
 
         String projectId = path.substring(path.lastIndexOf('/') + 1);
         return uri.getScheme() + "://" + uri.getHost() + port + API + projectId + STORE;
+    }
+
+    private static ExecutorService fixedQueueDiscardingExecutor() {
+        // Name our threads so that it is easy for app developers to see who is creating threads.
+        final ThreadFactory threadFactory = new ThreadFactory() {
+            private final AtomicLong count = new AtomicLong();
+
+            @Override
+            public Thread newThread(Runnable runnable) {
+                final Thread thread = new Thread(runnable);
+                thread.setName(String.format(Locale.US, "Sentry HTTP Thread %d", count.incrementAndGet()));
+                return thread;
+            }
+        };
+
+        return new ThreadPoolExecutor(
+            0, 1, // Keep 0 threads alive. Max pool size is 1.
+            60, TimeUnit.SECONDS, // Kill unused threads after this length.
+            new ArrayBlockingQueue<Runnable>(MAX_QUEUE_LENGTH),
+            threadFactory, new ThreadPoolExecutor.DiscardPolicy()); // Discard exceptions
     }
 
     private static int getVerifySsl(Uri uri) {
@@ -145,18 +180,12 @@ public final class Sentry {
     }
 
     private String createXSentryAuthHeader() {
-        String header = "";
 
-        String publicKey = credentials.first;
-        String secretKey = credentials.second;
-
-        header += "Sentry sentry_version=" + sentryVersion + ",";
-        header += "sentry_client=sentry-android/" + VERSION + ",";
-        header += "sentry_timestamp=" + System.currentTimeMillis() + ",";
-        header += "sentry_key=" + publicKey+",";
-        header += "sentry_secret=" + secretKey;
-
-        return header;
+        return "Sentry " +
+            String.format("sentry_version=%s,", sentryVersion) +
+            String.format("sentry_client=sentry-android/%s,", BuildConfig.SENTRY_ANDROID_VERSION) +
+            String.format("sentry_key=%s,", publicKey) +
+            String.format("sentry_secret=%s", secretKey);
     }
 
 
@@ -193,6 +222,22 @@ public final class Sentry {
         String culprit = getCause(t, t.getMessage());
 
         captureEvent(newEventBuilder().setMessage(t.getMessage()).setCulprit(culprit).setLevel(level).setException(t));
+    }
+
+    public void captureException(Throwable t, String message) {
+        captureException(t, message, SentryEventBuilder.SentryEventLevel.ERROR);
+    }
+
+    public void captureException(Throwable t, String message, SentryEventBuilder.SentryEventLevel level) {
+        String culprit = getCause(t, t.getMessage());
+
+        captureEvent(newEventBuilder()
+            .setMessage(message)
+            .setCulprit(culprit)
+            .setLevel(level)
+            .setException(t)
+        );
+
     }
 
     public void captureUncaughtException(Context context, Throwable t) {
@@ -235,19 +280,8 @@ public final class Sentry {
     }
 
     public void captureEvent(SentryEventBuilder builder) {
-        JSONObject request;
-        if (captureListener != null) {
+        JSONObject request = createEvent(builder);
 
-            builder = captureListener.beforeCapture(builder);
-            if (builder == null) {
-                logW("SentryEventBuilder in captureEvent is null");
-                return;
-            }
-
-            request = createRequest(builder);
-        } else {
-            request = createRequest(builder);
-        }
 
         if (enableDebugLogging) {
             //this string can be really big so there is no need to log if logging is disabled
@@ -257,9 +291,22 @@ public final class Sentry {
         doCaptureEventPost(request);
     }
 
+    private JSONObject createEvent(SentryEventBuilder builder) {
+        builder.setJsonArray("breadcrumbs", breadcrumbs.current());
+        if (captureListener != null) {
+
+            builder = captureListener.beforeCapture(builder);
+            if (builder == null) {
+                logW("SentryEventBuilder in captureEvent is null");
+                return null;
+            }
+        }
+        return createRequest(builder);
+    }
+
     private boolean shouldAttemptPost() {
         PackageManager pm = context.getPackageManager();
-        int hasPerm = pm.checkPermission(android.Manifest.permission.ACCESS_NETWORK_STATE, packageName);
+        int hasPerm = pm.checkPermission(Manifest.permission.ACCESS_NETWORK_STATE, packageName);
         if (hasPerm == PackageManager.PERMISSION_DENIED) {
             return true;
         }
@@ -311,7 +358,7 @@ public final class Sentry {
         boolean success = false;
         try {
             builder.header("X-Sentry-Auth", createXSentryAuthHeader());
-            builder.header("User-Agent", "sentry-android/" + VERSION);
+            builder.header("User-Agent", "sentry-android/" + BuildConfig.SENTRY_ANDROID_VERSION);
             builder.header("Content-Type", MEDIA_TYPE);
 
             builder.content(request.toString(), MEDIA_TYPE);
@@ -321,7 +368,11 @@ public final class Sentry {
             success = status == HTTP_OK;
 
             logD("SendEvent - " + status + " " + httpResponse.getContent());
-        } catch (Exception e) {
+        }catch (UnknownHostException unh) {
+            //LogCat does not log UnknownHostException
+           logW("UnknownHostException on sending event");
+        }
+        catch (Exception e) {
             logW(e);
         }
 
@@ -381,12 +432,10 @@ public final class Sentry {
             }
             // Here you should have a more robust, permanent record of problems
             SentryEventBuilder builder = newEventBuilder(e, SentryEventBuilder.SentryEventLevel.FATAL);
-            if (captureListener != null) {
-                builder = captureListener.beforeCapture(builder);
-            }
 
-            if (builder != null) {
-                addRequest(createRequest(builder));
+            JSONObject event = createEvent(builder);
+            if (event != null) {
+                addRequest(event);
             } else {
                 logW("SentryEventBuilder in uncaughtException is null");
             }
@@ -524,17 +573,60 @@ public final class Sentry {
         SentryEventBuilder beforeCapture(SentryEventBuilder builder);
     }
 
+
+    /**
+     * The Sentry server assumes the time is in UTC.
+     * The timestamp should be in ISO 8601 format, without a timezone.
+     */
+    private static SimpleDateFormat iso8601() {
+        final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return format;
+    }
+
     public static final class SentryEventBuilder {
 
+        static final Pattern IS_INTERNAL_PACKAGE = Pattern.compile("^(java|android|com\\.android|com\\.google\\.android|dalvik\\.system)\\..*");
         private static final ThreadLocal<SimpleDateFormat> sdf = new ThreadLocal<SimpleDateFormat>() {
             @Override
             protected SimpleDateFormat initialValue() {
-                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
-                format.setTimeZone(TimeZone.getTimeZone("GMT"));
-                return format;
+                return iso8601();
             }
         };
+        private static final Pattern PATTERN = Pattern.compile("-", Pattern.LITERAL);
         private JSONObject event;
+
+        // Convert a StackTraceElement to a sentry.interfaces.stacktrace.Stacktrace JSON object.
+        static JSONObject frameJson(StackTraceElement ste) throws JSONException {
+            final JSONObject frame = new JSONObject();
+
+            final String method = ste.getMethodName();
+            if (!TextUtils.isEmpty(method)) {
+                frame.put("function", method);
+            }
+
+            final String fileName = ste.getFileName();
+            if (!TextUtils.isEmpty(fileName)) {
+                frame.put("filename", fileName);
+            }
+
+            int lineno = ste.getLineNumber();
+            if (!ste.isNativeMethod() && lineno >= 0) {
+                frame.put("lineno", lineno);
+            }
+
+            String className = ste.getClassName();
+            frame.put("module", className);
+
+            // Take out some of the system packages to improve the exception folding on the sentry server
+            frame.put("in_app", !IS_INTERNAL_PACKAGE.matcher(className).matches());
+
+            return frame;
+        }
+
+        public SentryEventBuilder setContexts(JSONObject contexts) {
+            return setJsonObject("contexts", contexts);
+        }
 
         public enum SentryEventLevel {
 
@@ -553,10 +645,10 @@ public final class Sentry {
 
         private boolean enableLogging;
 
-        private SentryEventBuilder(boolean enableLogging) {
+        SentryEventBuilder(boolean enableLogging) {
             this.enableLogging = enableLogging;
             event = new JSONObject();
-            setString(EVENT_ID, UUID.randomUUID().toString().replace("-", ""));
+            setString(EVENT_ID, PATTERN.matcher(UUID.randomUUID().toString()).replaceAll(Matcher.quoteReplacement("")));
             setString("platform", "java");
             setTimestamp(System.currentTimeMillis());
         }
@@ -618,8 +710,12 @@ public final class Sentry {
         }
 
         private SentryEventBuilder setString(String key, String culprit) {
+            return putSafely(key, culprit);
+        }
+
+        private SentryEventBuilder putSafely(String key, Object object) {
             try {
-                event.put(key, culprit);
+                event.put(key, object);
             } catch (JSONException e) {
                 //there should be no exception
                 logW("", e, enableLogging);
@@ -657,18 +753,36 @@ public final class Sentry {
             return this;
         }
 
+        public SentryEventBuilder addTag(String key, String value) {
+            try {
+                getTags().put(key, value);
+            } catch (JSONException e) {
+                Log.e(Sentry.TAG, "Error adding tag in SentryEventBuilder");
+            }
+
+            return this;
+        }
+
+        public SentryEventBuilder addExtra(String key, String value) {
+            try {
+                getExtra().put(key, value);
+            } catch (JSONException e) {
+                Log.e(Sentry.TAG, "Error adding extra in SentryEventBuilder");
+            }
+
+            return this;
+        }
+
         public SentryEventBuilder setTags(JSONObject tags) {
             return setJsonObject("tags", tags);
         }
 
-        private SentryEventBuilder setJsonObject(String key, JSONObject object) {
-            try {
-                event.put(key, object);
-            } catch (JSONException e) {
-                //there should be no exception
-                logW("", e, enableLogging);
-            }
-            return this;
+        public SentryEventBuilder setJsonObject(String key, JSONObject object) {
+           return putSafely(key, object);
+        }
+
+        public SentryEventBuilder setJsonArray(String key, JSONArray object) {
+           return putSafely(key, object);
         }
 
         public JSONObject getTags() {
@@ -685,6 +799,14 @@ public final class Sentry {
          */
         public SentryEventBuilder setServerName(String serverName) {
             return setString("server_name", serverName);
+        }
+
+        /**
+         * @param environment The environment name, such as production or staging
+         * @return SentryEventBuilder
+         */
+        public SentryEventBuilder setEnvironment(String environment) {
+            return setString("environment", environment);
         }
 
         /**
@@ -755,11 +877,11 @@ public final class Sentry {
                     exception.put("type", t.getClass().getSimpleName());
                     exception.put("value", t.getMessage());
                     exception.put("module", t.getClass().getPackage().getName());
-                    exception.put("stacktrace", getStackTrace(t));
+                    exception.put("stacktrace", getStackTrace(t.getStackTrace()));
 
                     values.put(exception);
                 } catch (JSONException e) {
-                    logW("Failed to build sentry report for " + t, e, enableLogging);
+                    Log.e(TAG, "Failed to build sentry report for " + t, e);
                 }
 
                 t = t.getCause();
@@ -771,52 +893,208 @@ public final class Sentry {
                 exceptionReport.put("values", values);
                 event.put("exception", exceptionReport);
             } catch (JSONException e) {
-                logW("Unable to attach exception to event " + values, e, enableLogging);
+                Log.e(TAG, "Unable to attach exception to event " + values, e);
             }
 
             return this;
         }
 
-        public static JSONObject getStackTrace(Throwable t) throws JSONException {
-            JSONArray frameList = new JSONArray();
+        /**
+         * Add a stack trace to the event.
+         * A stack trace for the current thread can be obtained by using
+         * `Thread.currentThread().getStackTrace()`.
+         *
+         * @param stackTrace stacktrace
+         * @return same builder
+         * @see Thread#currentThread()
+         * @see Thread#getStackTrace()
+         */
+        public SentryEventBuilder setStackTrace(StackTraceElement[] stackTrace) {
+            setJsonObject("stacktrace", getStackTrace(stackTrace));
+            return this;
+        }
 
-            for (StackTraceElement ste : t.getStackTrace()) {
-                JSONObject frame = new JSONObject();
+        private static JSONObject getStackTrace(StackTraceElement[] stackFrames) {
 
-                String method = ste.getMethodName();
-                if (method.length() != 0) {
-                    frame.put("function", method);
+            JSONObject stacktrace = new JSONObject();
+
+            try {
+                JSONArray frameList = new JSONArray();
+
+                // Java stack frames are in the opposite order from what the Sentry client API expects.
+                // > The zeroth element of the array (assuming the array's length is non-zero)
+                // > represents the top of the stack, which is the last method invocation in the
+                // > sequence.
+                // See:
+                // https://docs.oracle.com/javase/7/docs/api/java/lang/Throwable.html#getStackTrace()
+                // https://docs.sentry.io/clientdev/interfaces/#failure-interfaces
+                //
+                // This code uses array indices rather a foreach construct since there is no built-in
+                // reverse iterator in the Java standard library. To use a foreach loop would require
+                // calling Collections.reverse which would require copying the array to a list.
+                for (int i = stackFrames.length - 1; i >= 0; i--) {
+                    frameList.put(frameJson(stackFrames[i]));
                 }
 
-                int lineno = ste.getLineNumber();
-                if (!ste.isNativeMethod() && lineno >= 0) {
-                    frame.put("lineno", lineno);
-                }
-
-                boolean inApp = true;
-
-                String className = ste.getClassName();
-                frame.put("module", className);
-
-                // Take out some of the system packages to improve the exception folding on the sentry server
-                if (className.startsWith("android.") || className.startsWith("java.") || className.startsWith("dalvik.") || className.startsWith("com.android.")) {
-
-                    inApp = false;
-                }
-
-                frame.put("in_app", inApp);
-
-                frameList.put(frame);
+                stacktrace.put("frames", frameList);
+            } catch (JSONException e) {
+                Log.e(TAG, "Error serializing stack frames", e);
             }
 
-            JSONObject frameHash = new JSONObject();
-            frameHash.put("frames", frameList);
-
-            return frameHash;
+            return stacktrace;
         }
 
         private JSONObject toJson() {
             return event;
         }
     }
+
+    private final static class Breadcrumb {
+
+        enum Type {
+
+            Default("default"),
+            HTTP("http"),
+            Navigation("navigation");
+
+            private final String value;
+
+            Type(String value) {
+                this.value = value;
+            }
+        }
+
+        final long timestamp;
+        final Type type;
+        final String message;
+        final String category;
+        final SentryEventBuilder.SentryEventLevel level;
+        final Map<String, String> data = new HashMap<>();
+
+        Breadcrumb(long timestamp, Type type, String message, String category, SentryEventBuilder.SentryEventLevel level) {
+            this.timestamp = timestamp;
+            this.type = type;
+            this.message = message;
+            this.category = category;
+            this.level = level;
+        }
+    }
+
+    private static class Breadcrumbs {
+
+        // The max number of breadcrumbs that will be tracked at any one time.
+        private static final int MAX_BREADCRUMBS = 10;
+
+
+        // Access to this list must be thread-safe.
+        // See GitHub Issue #110
+        // This list is protected by the provided ReadWriteLock.
+        private final LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
+        private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
+        void push(Breadcrumb b) {
+            try {
+                lock.writeLock().lock();
+                while (breadcrumbs.size() >= MAX_BREADCRUMBS) {
+                    breadcrumbs.removeFirst();
+                }
+                breadcrumbs.add(b);
+            } finally {
+                lock.writeLock().unlock();
+            }
+        }
+
+        JSONArray current() {
+            final JSONArray crumbs = new JSONArray();
+            try {
+                lock.readLock().lock();
+                for (Breadcrumb breadcrumb : breadcrumbs) {
+                    final JSONObject json = new JSONObject();
+                    json.put("timestamp", breadcrumb.timestamp);
+                    json.put("type", breadcrumb.type.value);
+                    json.put("message", breadcrumb.message);
+                    json.put("category", breadcrumb.category);
+                    json.put("level", breadcrumb.level.value);
+                    json.put("data", new JSONObject(breadcrumb.data));
+                    crumbs.put(json);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error serializing breadcrumbs", e);
+            } finally {
+                lock.readLock().unlock();
+            }
+            return crumbs;
+        }
+
+    }
+
+    /**
+     * Record a breadcrumb to log a navigation from `from` to `to`.
+     *
+     * @param category A category to label the event under. This generally is similar to a logger
+     *                 name, and will let you more easily understand the area an event took place, such as auth.
+     * @param from     A string representing the original application state / location.
+     * @param to       A string representing the new application state / location.
+     * @see com.joshdholtz.sentry.Sentry#addHttpBreadcrumb(String, String, int)
+     */
+    public void addNavigationBreadcrumb(String category, String from, String to) {
+        final Breadcrumb b = new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.Navigation,
+            "",
+            category,
+            SentryEventBuilder.SentryEventLevel.INFO);
+
+        b.data.put("from", from);
+        b.data.put("to", to);
+        breadcrumbs.push(b);
+    }
+
+    /**
+     * Record a HTTP request breadcrumb. This represents an HTTP request transmitted from your
+     * application. This could be an AJAX request from a web application, or a server-to-server HTTP
+     * request to an API service provider, etc.
+     *
+     * @param url        The request URL.
+     * @param method     The HTTP request method.
+     * @param statusCode The HTTP status code of the response.
+     * @see com.joshdholtz.sentry.Sentry#addHttpBreadcrumb(String, String, int)
+     */
+    public void addHttpBreadcrumb(String url, String method, int statusCode) {
+        final Breadcrumb b = new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.HTTP,
+            "",
+            String.format("http.%s", method.toLowerCase()),
+            SentryEventBuilder.SentryEventLevel.INFO);
+
+        b.data.put("url", url);
+        b.data.put("method", method);
+        b.data.put("status_code", Integer.toString(statusCode));
+        breadcrumbs.push(b);
+    }
+
+    /**
+     * Sentry supports a concept called Breadcrumbs, which is a trail of events which happened prior
+     * to an issue. Often times these events are very similar to traditional logs, but also have the
+     * ability to record more rich structured data.
+     *
+     * @param category A category to label the event under. This generally is similar to a logger
+     *                 name, and will let you more easily understand the area an event took place,
+     *                 such as auth.
+     * @param message  A string describing the event. The most common vector, often used as a drop-in
+     *                 for a traditional log message.
+     *                 <p>
+     *                 See https://docs.sentry.io/hosted/learn/breadcrumbs/
+     */
+    public void addBreadcrumb(String category, String message) {
+        breadcrumbs.push(new Breadcrumb(
+            System.currentTimeMillis() / 1000,
+            Breadcrumb.Type.Default,
+            message,
+            category,
+            SentryEventBuilder.SentryEventLevel.INFO));
+    }
+
+
 }

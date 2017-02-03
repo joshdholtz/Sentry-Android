@@ -1,7 +1,6 @@
 package com.joshdholtz.sentry;
 
 import android.content.Context;
-import android.util.Pair;
 
 public final class SentryInstance {
 
@@ -9,14 +8,14 @@ public final class SentryInstance {
     private static SentryInstance ourInstance = new SentryInstance();
     private Sentry sentry;
 
-    public static void init(Context context, String dsnWithoutCredentials, HttpRequestSender httpRequestSender, Pair<String, String> credentials) {
-        ourInstance.sentry = Sentry.newInstance(context, dsnWithoutCredentials, httpRequestSender, FILE_NAME, credentials);
+    public static void init(Context context, String dsnWithoutCredentials, HttpRequestSender httpRequestSender, String publicKey,String secretKey) {
+        ourInstance.sentry = Sentry.newInstance(context, dsnWithoutCredentials, httpRequestSender, FILE_NAME, publicKey, secretKey);
     }
 
     /**
-     * {@link #init(Context, String, HttpRequestSender, Pair)} must be called before this
+     * {@link #init(Context, String, HttpRequestSender, String, String)} must be called before this
      *
-     * @return {@code Sentry} instance created in {@link #init(Context, String, HttpRequestSender, Pair)} (Context, String, HttpRequestSender)}
+     * @return {@code Sentry} instance created in {@link #init(Context, String, HttpRequestSender, String, String)} (Context, String, HttpRequestSender, Pair)} (Context, String, HttpRequestSender)}
      */
     public static Sentry getInstance() {
         return ourInstance.sentry;

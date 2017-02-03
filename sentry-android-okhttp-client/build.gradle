@@ -1,19 +1,21 @@
-group = 'com.joshdholtz.sentry'
-version = '1.4.2-finanteq'
+plugins {
+    id "com.jfrog.bintray" version "1.7.3"
+}
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
 
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion ext_compileSdkVersion
+    buildToolsVersion ext_buildToolsVersion
 
     defaultConfig {
-        minSdkVersion 10
-        targetSdkVersion 23
+        minSdkVersion ext_minSdkVersion
+        targetSdkVersion ext_targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -22,6 +24,7 @@ android {
     }
 }
 
+
 ext {
     libraryName = 'sentry-android-okhttp-client'
     artifact = 'sentry-android-okhttp-client'
@@ -29,9 +32,9 @@ ext {
 }
 
 dependencies {
-    compile "com.squareup.okhttp3:okhttp:3.4.1"
-//    compile project(":sentry-android")
-    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+    compile "com.squareup.okhttp3:okhttp:3.5.0"
+    compile project(":sentry-android")
+//    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
 }
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
