@@ -738,7 +738,7 @@ public final class Sentry {
 
         public JSONObject getUser() {
             if (!event.has("user")) {
-                setTags(new JSONObject());
+                setUser(new JSONObject());
             }
 
             return (JSONObject) event.opt("user");
