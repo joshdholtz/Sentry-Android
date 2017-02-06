@@ -1,0 +1,54 @@
+plugins {
+    id "com.jfrog.bintray" version "1.7.3"
+}
+apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+
+
+android {
+    compileSdkVersion ext_compileSdkVersion
+    buildToolsVersion ext_buildToolsVersion
+
+    defaultConfig {
+        minSdkVersion ext_minSdkVersion
+        targetSdkVersion ext_targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+
+ext {
+    libraryName = 'sentry-android-okhttp-client'
+    artifact = 'sentry-android-okhttp-client'
+    libraryDescription = 'A Sentry okhttp client for Android'
+}
+
+dependencies {
+    compile "com.squareup.okhttp3:okhttp:3.6.0"
+    compile project(":sentry-android")
+//    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+}
+
+apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
+apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: nexusReleaseRepository) {
+                authentication(userName: nexusUserName, password: nexusPassword)
+            }
+            snapshotRepository(url: nexusSnapshotRepository) {
+                authentication(userName: nexusUserName, password: nexusPassword)
+            }
+        }
+    }
+}

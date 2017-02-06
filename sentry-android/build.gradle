@@ -1,26 +1,22 @@
 plugins {
-    id "com.jfrog.bintray" version "1.7"
+    id "com.jfrog.bintray" version "1.7.3"
 }
 
 apply plugin: 'com.android.library'
 
-
-def SentryAndroidVersion = "1.5.4"
-
 android {
-    compileSdkVersion 24
-    buildToolsVersion "23.0.3"
-
-    useLibrary 'org.apache.http.legacy'
+    compileSdkVersion ext_compileSdkVersion
+    buildToolsVersion ext_buildToolsVersion
 
     defaultConfig {
-        minSdkVersion 3
-        targetSdkVersion 24
+        minSdkVersion ext_minSdkVersion
+        targetSdkVersion ext_targetSdkVersion
         versionCode 1
         versionName "1.0"
 
-        buildConfigField "String", "SENTRY_ANDROID_VERSION", "\"${SentryAndroidVersion}\""
+        buildConfigField "String", "SENTRY_ANDROID_VERSION", "\"${libraryVersion}\""
     }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -31,35 +27,16 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    provided 'org.jbundle.util.osgi.wrapped:org.jbundle.util.osgi.wrapped.org.apache.http.client:4.1.2'
     androidTestCompile 'com.google.guava:guava:19.0'
-
 }
 
 ext {
-    bintrayRepo = 'maven'
-    bintrayName = 'sentry-android'
-
-    publishedGroupId = 'com.joshdholtz.sentry'
     libraryName = 'sentry-android'
     artifact = 'sentry-android'
 
     libraryDescription = 'A Sentry client for Android'
-
-    siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
-    gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
-
-    libraryVersion = SentryAndroidVersion
-
-    developerId = 'joshdholtz'
-    developerName = 'Josh Holtz'
-    developerEmail = 'josh@rokkincat.com'
-
-    licenseName = 'The MIT License (MIT)'
-    licenseUrl = 'http://opensource.org/licenses/mit-license.php'
-    allLicenses = ["MIT"]
 }
+
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/bintrayv1.gradle'
-

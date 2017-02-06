@@ -1,0 +1,37 @@
+apply plugin: 'com.android.library'
+
+
+android {
+    compileSdkVersion ext_compileSdkVersion
+    buildToolsVersion ext_buildToolsVersion
+
+    useLibrary 'org.apache.http.legacy'
+
+
+    defaultConfig {
+        minSdkVersion ext_minSdkVersion
+        targetSdkVersion ext_targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+ext {
+    libraryName = 'sentry-android-apache-http-client'
+    artifact = 'sentry-android-apache-http-client'
+    libraryDescription = 'A Sentry Apache http client for Android'
+}
+
+dependencies {
+    provided 'org.jbundle.util.osgi.wrapped:org.jbundle.util.osgi.wrapped.org.apache.http.client:4.1.2'
+//    compile "com.joshdholtz.sentry:sentry-android:${libraryVersion}"
+    compile project(":sentry-android")
+
+}

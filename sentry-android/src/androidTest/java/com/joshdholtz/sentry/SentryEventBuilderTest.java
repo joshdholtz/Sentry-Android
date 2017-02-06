@@ -1,7 +1,5 @@
 package com.joshdholtz.sentry;
 
-import android.provider.Telephony;
-
 import com.google.common.base.Joiner;
 
 import junit.framework.TestCase;
@@ -11,7 +9,6 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 public class SentryEventBuilderTest extends TestCase {
 
@@ -21,7 +18,7 @@ public class SentryEventBuilderTest extends TestCase {
         initialExtra.put("key1", "value1");
         initialExtra.put("key2", "value2");
 
-        Sentry.SentryEventBuilder builder = new Sentry.SentryEventBuilder()
+        Sentry.SentryEventBuilder builder = createSentryEventBuilder()
                 .setMessage("Being awesome")
                 .setExtra(initialExtra);
 
@@ -41,18 +38,22 @@ public class SentryEventBuilderTest extends TestCase {
         initialTags.put("tag1", "value1");
         initialTags.put("tag2", "value2");
 
-        Sentry.SentryEventBuilder builder = new Sentry.SentryEventBuilder()
+        Sentry.SentryEventBuilder builder = createSentryEventBuilder()
                 .setMessage("Being awesome")
                 .setTags(initialTags);
 
         JSONObject tags = builder.getTags();
-        assertEquals("value1", tags.getString("key1"));
-        assertEquals("value2", tags.getString("key2"));
+        assertEquals("value1", tags.getString("tag1"));
+        assertEquals("value2", tags.getString("tag2"));
 
         builder.addTag("key3", "value3");
 
-        JSONObject moreTags = builder.getExtra();
+        JSONObject moreTags = builder.getTags();
         assertEquals("value3", moreTags.getString("key3"));
+    }
+
+    private Sentry.SentryEventBuilder createSentryEventBuilder() {
+        return new Sentry.SentryEventBuilder(true);
     }
 
     // Since regexes are very hard to read, we build the regex to recognize an internal package
@@ -99,7 +100,7 @@ public class SentryEventBuilderTest extends TestCase {
                 "com.android",
                 "com.google.android",
                 "dalvik.system"};
-        assertEquals(Sentry.SentryEventBuilder.isInternalPackage, toPackageRegex(internalPackages));
+        assertEquals(Sentry.SentryEventBuilder.IS_INTERNAL_PACKAGE.pattern(), toPackageRegex(internalPackages));
 
 
         final String[] internalClasses = {
@@ -110,7 +111,7 @@ public class SentryEventBuilderTest extends TestCase {
                 "dalvik.system.console"
         };
         for (String c : internalClasses) {
-            assertTrue(c, c.matches(Sentry.SentryEventBuilder.isInternalPackage));
+            assertTrue(c, Sentry.SentryEventBuilder.IS_INTERNAL_PACKAGE.matcher(c).matches());
         }
 
         final String[] userClasses= {
@@ -119,7 +120,7 @@ public class SentryEventBuilderTest extends TestCase {
         };
 
         for (String c : userClasses) {
-            assertFalse(c, c.matches(Sentry.SentryEventBuilder.isInternalPackage));
+            assertFalse(c, Sentry.SentryEventBuilder.IS_INTERNAL_PACKAGE.matcher(c).matches());
         }
     }
 }

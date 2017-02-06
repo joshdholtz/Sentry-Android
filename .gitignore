@@ -20,9 +20,6 @@ local.properties
 .classpath
 
 .gradle
-/local.properties
-/.idea/workspace.xml
-/.idea/misc.xml
-/.idea/libraries
 .DS_Store
-/build
+*.iml
+.idea/
