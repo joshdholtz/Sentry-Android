@@ -16,4 +16,9 @@
         android:layout_height="wrap_content"
         android:onClick="onClickCapture" />
 
+    <Button android:text="Launch Activity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="onClickLaunchActivity" />
+
 </LinearLayout>

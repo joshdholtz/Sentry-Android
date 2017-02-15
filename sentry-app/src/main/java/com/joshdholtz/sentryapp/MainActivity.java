@@ -1,5 +1,6 @@
 package com.joshdholtz.sentryapp;
 
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
@@ -19,9 +20,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getApplication().registerActivityLifecycleCallbacks(new SentryActivityListener());
+
         setContentView(R.layout.activity_main);
 
-        String yourDSN = "your-dsn";
+        String yourDSN = "https://cd95d48687a54ee1840a16ecef394c93:c9def31f1d5940b18b2a9b4ba149b19d@sentry.io/75499";
         Sentry.init(this, yourDSN);
         Sentry.debug = true;
 
@@ -84,5 +88,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void onClickLaunchActivity(View view) {
+        Intent intent = new Intent(this, SecondActivity.class);
+        startActivity(intent);
     }
 }
