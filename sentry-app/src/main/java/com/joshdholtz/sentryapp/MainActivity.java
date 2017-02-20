@@ -1,14 +1,18 @@
 package com.joshdholtz.sentryapp;
 
+import android.content.ComponentCallbacks;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 
 import com.joshdholtz.sentry.Sentry;
 
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,11 +21,42 @@ public class MainActivity extends AppCompatActivity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
+
+    void addListeners() {
+        try {
+            final View root = getWindow().getDecorView().getRootView();
+
+            if (root == null) {
+                return;
+            }
+
+            final ArrayList<View> touchables = root.getTouchables();
+
+            for (View touchable: touchables) {
+                touchable.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(final View v) {
+                        try {
+                            if (v instanceof Button) {
+                                final Button b = (Button)v;
+                                Sentry.addBreadcrumb("button.click", b.getText().toString());
+                            }
+                        } catch (Exception e) {
+                        }
+                    }
+                });
+            }
+        } catch (Exception e) {
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         getApplication().registerActivityLifecycleCallbacks(new SentryActivityListener());
+
+        addListeners();
 
         setContentView(R.layout.activity_main);
 
