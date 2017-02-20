@@ -122,4 +122,11 @@ public class SentryEventBuilderTest extends TestCase {
             assertFalse(c, c.matches(Sentry.SentryEventBuilder.isInternalPackage));
         }
     }
+
+    public void testMaxBreadcrumbs() {
+        Sentry.setMaxBreadcrumbs(-5);
+        assertEquals(0, Sentry.LazyHolder.instance.breadcrumbs.maxBreadcrumbs.get());
+        Sentry.setMaxBreadcrumbs(1000);
+        assertEquals(200, Sentry.LazyHolder.instance.breadcrumbs.maxBreadcrumbs.get());
+    }
 }

@@ -25,11 +25,18 @@ public class MainActivity extends AppCompatActivity {
         Sentry.init(this, yourDSN);
         Sentry.debug = true;
 
+
+        Sentry.setMaxBreadcrumbs(8);
+        for (int i=0; i<15; i++) {
+            Sentry.addBreadcrumb("Limit Test", Integer.toString(i));
+        }
+        Sentry.captureMessage("8 breadcrumbs test.");
+
         Sentry.addNavigationBreadcrumb("activity.main", "here", "there");
         Sentry.addHttpBreadcrumb("http://example.com", "GET", 202);
 
         Sentry.captureEvent(new Sentry.SentryEventBuilder()
-            .setMessage("OMG this works woooo")
+            .setMessage("This event has a message and a stacktrace.")
             .setStackTrace(Thread.currentThread().getStackTrace())
         );
 

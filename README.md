@@ -70,6 +70,7 @@ table below shows an example of what the data will look like in Sentry.
 
 Version | Changes
 --- | ---
+**1.6.0** | Increase breadcrumb limit to 100 to match other Sentry clients, allow runtime configuration. [#117](https://github.com/joshdholtz/Sentry-Android/issues/117).
 **1.5.4** | Ensure that breadcrumbs are added to all exceptions. [#115](https://github.com/joshdholtz/Sentry-Android/issues/115).
 **1.5.3** | Fix thread-safety bug when serializing breadcrumbs. [#110](https://github.com/joshdholtz/Sentry-Android/issues/110) (thanks to [fab1an](https://github.com/fab1an)).
 **1.5.2** | Send stack-frames to Sentry in the correct order. [#95](https://github.com/joshdholtz/Sentry-Android/pull/95).<br/> Use the [versionName](https://developer.android.com/studio/publish/versioning.html#appversioning), rather than versionCode, as the default value for the release field of events (thanks to [FelixBondarenko](https://github.com/FelixBondarenko)).
@@ -94,7 +95,7 @@ Version | Changes
 ### Gradle
 Available in jCenter
 ```
-compile 'com.joshdholtz.sentry:sentry-android:1.5.0'
+compile 'com.joshdholtz.sentry:sentry-android:1.6.0'
 ```
 
 ### Manual
