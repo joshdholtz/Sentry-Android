@@ -74,6 +74,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -100,7 +101,7 @@ public class Sentry {
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
-    private final Breadcrumbs breadcrumbs = new Breadcrumbs();
+    final Breadcrumbs breadcrumbs = new Breadcrumbs();
 
     public enum SentryEventLevel {
 
@@ -130,8 +131,8 @@ public class Sentry {
         return LazyHolder.instance;
     }
 
-    private static class LazyHolder {
-        private static final Sentry instance = new Sentry();
+    static class LazyHolder {
+        static final Sentry instance = new Sentry();
     }
 
     public static void init(Context context, String dsn) {
@@ -256,6 +257,16 @@ public class Sentry {
      */
     public static void setCaptureListener(SentryEventCaptureListener captureListener) {
         Sentry.getInstance().captureListener = captureListener;
+    }
+
+    /**
+     * Set a limit on the number of breadcrumbs that will be stored by the client, and sent with
+     * exceptions.
+     *
+     * @param maxBreadcrumbs the maximum number of breadcrumbs to store and send.
+     */
+    public static void setMaxBreadcrumbs(int maxBreadcrumbs) {
+        getInstance().breadcrumbs.setMaxBreadcrumbs(maxBreadcrumbs);
     }
 
     public static void captureMessage(String message) {
@@ -656,22 +667,23 @@ public class Sentry {
         }
     }
 
-    private static class Breadcrumbs {
+    static class Breadcrumbs {
 
         // The max number of breadcrumbs that will be tracked at any one time.
-        private static final int MAX_BREADCRUMBS = 10;
-
+        final AtomicInteger maxBreadcrumbs = new AtomicInteger(100);
 
         // Access to this list must be thread-safe.
         // See GitHub Issue #110
         // This list is protected by the provided ReadWriteLock.
-        private final LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
-        private final ReadWriteLock lock = new ReentrantReadWriteLock();
+        final LinkedList<Breadcrumb> breadcrumbs = new LinkedList<>();
+        final ReadWriteLock lock = new ReentrantReadWriteLock();
 
         void push(Breadcrumb b) {
             try {
                 lock.writeLock().lock();
-                while (breadcrumbs.size() >= MAX_BREADCRUMBS) {
+
+                final int toRemove = breadcrumbs.size() - maxBreadcrumbs.get() + 1;
+                for (int i = 0; i < toRemove; i++) {
                     breadcrumbs.removeFirst();
                 }
                 breadcrumbs.add(b);
@@ -700,6 +712,11 @@ public class Sentry {
                 lock.readLock().unlock();
             }
             return crumbs;
+        }
+
+        void setMaxBreadcrumbs(int maxBreadcrumbs) {
+            maxBreadcrumbs = Math.min(200, Math.max(0, maxBreadcrumbs));
+            this.maxBreadcrumbs.set(maxBreadcrumbs);
         }
 
     }
