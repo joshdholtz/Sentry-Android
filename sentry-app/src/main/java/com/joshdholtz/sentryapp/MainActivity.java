@@ -8,6 +8,8 @@ import android.view.View;
 
 import com.joshdholtz.sentry.Sentry;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,7 +76,18 @@ public class MainActivity extends AppCompatActivity {
         try {
             crash();
         } catch (Exception e) {
-            Sentry.captureException(e, "Exception caught in click handler");
+            Map<String, String> tags = new HashMap<>();
+            tags.put("color", "yellow");
+            tags.put("shape", "square");
+            Sentry.captureEvent(new Sentry.SentryEventBuilder()
+                .setException(e)
+                .setMessage("Exception caught in click handler")
+                .setServerName("https://badssl.com/")
+                .setCulprit("https://untrusted-root.badssl.com/")
+                .setLevel(Sentry.SentryEventLevel.WARNING)
+                .setLogger("A logger")
+                .setRelease("f035a895a5167ebd20a597d47761e033995e6689")
+                .setTags(tags));
         }
     }
 
