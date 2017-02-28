@@ -65,6 +65,8 @@ table below shows an example of what the data will look like in Sentry.
 
 </table>
 
+### Crash Report Behavior
+Sentry-Android will attempt to send all crash reports when the app starts back up. If something fails to upload, Sentry-Android will attempt to send again on next start. If you would like to manually attempt to send crash reports, please use the following call in your app :blush: `Sentry.sendAllCachedCapturedEvents()`
 
 ### Updates
 
