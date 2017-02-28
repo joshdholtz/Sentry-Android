@@ -287,7 +287,7 @@ public class Sentry {
         final Sentry sentry = Sentry.getInstance();
         final SentryEventRequest request;
         builder.event.put("contexts", sentry.contexts);
-        builder.setRelease(sentry.appInfo.versionName);
+        addDefaultRelease(builder, sentry.appInfo);
         builder.event.put("breadcrumbs", Sentry.getInstance().breadcrumbs.current());
         if (sentry.captureListener != null) {
 
@@ -440,7 +440,7 @@ public class Sentry {
 
             // Here you should have a more robust, permanent record of problems
             SentryEventBuilder builder = new SentryEventBuilder(e, SentryEventLevel.FATAL);
-            builder.setRelease(sentry.appInfo.versionName);
+            addDefaultRelease(builder, sentry.appInfo);
             builder.event.put("breadcrumbs", sentry.breadcrumbs.current());
 
             if (sentry.captureListener != null) {
@@ -747,7 +747,7 @@ public class Sentry {
 
         private final static DateFormat timestampFormat = iso8601();
 
-        private final Map<String, Object> event;
+        final Map<String, Object> event;
 
         public JSONObject toJSON() {
             return new JSONObject(event);
@@ -1065,7 +1065,7 @@ public class Sentry {
      *
      * @see PackageInfo
      */
-    private final static class AppInfo {
+    final static class AppInfo {
         final static AppInfo Empty = new AppInfo("", "", 0);
         final String name;
         final String versionName;
@@ -1253,5 +1253,12 @@ public class Sentry {
      */
     private static boolean Present(String s) {
         return s != null && s.length() > 0;
+    }
+
+    static void addDefaultRelease(SentryEventBuilder event, AppInfo appInfo) {
+        if (event.event.containsKey("release")) {
+            return;
+        }
+        event.setRelease(appInfo.versionName);
     }
 }
