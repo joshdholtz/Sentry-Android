@@ -70,6 +70,7 @@ table below shows an example of what the data will look like in Sentry.
 
 Version | Changes
 --- | ---
+**1.6.1** | Fix bug in release version setting - the built-in package version was overriding the user-specified one. [#120](https://github.com/joshdholtz/Sentry-Android/issues/120)
 **1.6.0** | Increase breadcrumb limit to 100 to match other Sentry clients, allow runtime configuration. [#117](https://github.com/joshdholtz/Sentry-Android/issues/117). <br/>Removed org.apache HTTP library [116](https://github.com/joshdholtz/Sentry-Android/pull/116).
 **1.5.4** | Ensure that breadcrumbs are added to all exceptions. [#115](https://github.com/joshdholtz/Sentry-Android/issues/115).
 **1.5.3** | Fix thread-safety bug when serializing breadcrumbs. [#110](https://github.com/joshdholtz/Sentry-Android/issues/110) (thanks to [fab1an](https://github.com/fab1an)).
