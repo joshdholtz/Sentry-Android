@@ -129,4 +129,17 @@ public class SentryEventBuilderTest extends TestCase {
         Sentry.setMaxBreadcrumbs(1000);
         assertEquals(200, Sentry.LazyHolder.instance.breadcrumbs.maxBreadcrumbs.get());
     }
+
+    public void testDefaultRelease() {
+        Sentry.SentryEventBuilder b = new Sentry.SentryEventBuilder();
+        Sentry.addDefaultRelease(b, new Sentry.AppInfo("name", "versionName", 31));
+        assertEquals("versionName", b.event.get("release"));
+    }
+
+    public void testCustomRelease() {
+        Sentry.SentryEventBuilder b = new Sentry.SentryEventBuilder();
+        b.setRelease("custom-version");
+        Sentry.addDefaultRelease(b, new Sentry.AppInfo("name", "versionName", 31));
+        assertEquals("custom-version", b.event.get("release"));
+    }
 }
