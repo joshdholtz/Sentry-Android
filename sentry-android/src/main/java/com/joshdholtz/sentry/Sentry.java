@@ -816,6 +816,17 @@ public class Sentry {
         }
 
         /**
+         * "environment": "dev"
+         *
+         * @param environment Environment
+         * @return SentryEventBuilder
+         */
+        public SentryEventBuilder setLogger(String environment) {
+            event.put("environment", environment);
+            return this;
+        }
+
+        /**
          * "culprit": "my.module.function_name"
          *
          * @param culprit Culprit
