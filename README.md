@@ -190,14 +190,6 @@ Sentry.setCaptureListener(new SentryEventCaptureListener() {
 
 ```
 
-## Use for self hosted Sentry
-
-### Init with your base url
-``` java
-Sentry.init(this, "http://your-base-url.com" "YOUR-SENTRY-DSN");
-
-```
-
 ## Contact
 
 Email: [josh@rokkincat.com](mailto:josh@rokkincat.com)<br/>
