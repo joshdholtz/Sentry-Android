@@ -5,7 +5,7 @@ plugins {
 apply plugin: 'com.android.library'
 
 
-def SentryAndroidVersion = "1.6.1"
+def SentryAndroidVersion = "1.6.2"
 
 android {
     compileSdkVersion 24
