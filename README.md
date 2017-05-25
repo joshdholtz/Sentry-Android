@@ -72,6 +72,7 @@ Sentry-Android will attempt to send all crash reports when the app starts back u
 
 Version | Changes
 --- | ---
+**1.6.2** | Now able to set the environment of the app [#123](https://github.com/joshdholtz/Sentry-Android/issues/123)
 **1.6.1** | Fix bug in release version setting - the built-in package version was overriding the user-specified one. [#120](https://github.com/joshdholtz/Sentry-Android/issues/120)
 **1.6.0** | Increase breadcrumb limit to 100 to match other Sentry clients, allow runtime configuration. [#117](https://github.com/joshdholtz/Sentry-Android/issues/117). <br/>Removed org.apache HTTP library [116](https://github.com/joshdholtz/Sentry-Android/pull/116).
 **1.5.4** | Ensure that breadcrumbs are added to all exceptions. [#115](https://github.com/joshdholtz/Sentry-Android/issues/115).
