@@ -41,8 +41,8 @@ ext {
 
     libraryDescription = 'A Sentry client for Android'
 
-    siteUrl = 'https://github.com/nuuneoi/FBLikeAndroid'
-    gitUrl = 'https://github.com/nuuneoi/FBLikeAndroid.git'
+    siteUrl = 'https://github.com/joshdholtz/Sentry-Android'
+    gitUrl = 'https://github.com/joshdholtz/Sentry-Android.git'
 
     libraryVersion = SentryAndroidVersion
 
