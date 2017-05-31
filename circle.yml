@@ -1,18 +1,21 @@
-dependencies:
-  pre:
-    - touch local.properties
-
 machine:
   environment:
     QEMU_AUDIO_DRV: none
+    TERM: dumb
 
-test:
+dependencies:
   pre:
+    - touch local.properties
+    - cp -rv licenses $ANDROID_HOME
+    - echo y | android update sdk --no-ui --all --filter build-tools-25.0.3
     - emulator -avd circleci-android24 -no-window:
         background: true
         parallel: true
-    - circle-android wait-for-boot
   override:
     - ./gradlew assembleAndroidTest
+
+test:
+  override:
+    - circle-android wait-for-boot
     - adb install sentry-android/build/outputs/apk/sentry-android-debug-androidTest.apk
     - adb shell am instrument -w com.joshdholtz.sentry.test/android.test.InstrumentationTestRunner
