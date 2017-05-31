@@ -816,6 +816,17 @@ public class Sentry {
         }
 
         /**
+         * "environment": "dev"
+         *
+         * @param env Environment
+         * @return SentryEventBuilder
+         */
+        public SentryEventBuilder setEnvironment(String env) {
+            event.put("environment", env);
+            return this;
+        }
+
+        /**
          * "culprit": "my.module.function_name"
          *
          * @param culprit Culprit
@@ -1159,11 +1170,7 @@ public class Sentry {
             os.put("type", "os");
             os.put("name", "Android");
             os.put("version", Build.VERSION.RELEASE);
-            if (Build.VERSION.SDK_INT < 4) {
-                os.put("build", Build.VERSION.SDK);
-            } else {
-                os.put("build", Integer.toString(Build.VERSION.SDK_INT));
-            }
+            os.put("build", Integer.toString(Build.VERSION.SDK_INT));
             final String kernelVersion = System.getProperty("os.version");
             if (Present(kernelVersion)) {
                 os.put("kernel_version", kernelVersion);
