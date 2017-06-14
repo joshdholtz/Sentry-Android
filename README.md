@@ -1,4 +1,6 @@
-# Sentry-Android - Sentry Client for Android
+# [Deprecated] Sentry-Android - Sentry Client for Android
+:warning: Please use official `raven-java` library - https://github.com/getsentry/sentry-java
+
 It does what every Sentry client needs to do
 
 Below is an example of how to register Sentry-Android to handle uncaught exceptions
