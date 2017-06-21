@@ -77,6 +77,7 @@ public class Sentry {
     private SentryEventCaptureListener captureListener;
     private JSONObject contexts = new JSONObject();
     private Executor executor;
+    private boolean disableOnDebug;
     final Breadcrumbs breadcrumbs = new Breadcrumbs();
 
     public enum SentryEventLevel {
@@ -111,14 +112,19 @@ public class Sentry {
         static final Sentry instance = new Sentry();
     }
 
-    public static void init(Context context, String dsn) {
-        init(context, dsn, true);
+    public static void init(Context context, String dsn, boolean disableOnDebug) {
+        init(context, dsn, true, disableOnDebug);
     }
 
-    public static void init(Context context, String dsn, boolean setupUncaughtExceptionHandler) {
+    public static void init(Context context, String dsn) {
+        init(context, dsn, true, false);
+    }
+
+    public static void init(Context context, String dsn, boolean setupUncaughtExceptionHandler, boolean disableOnDebug) {
         final Sentry sentry = Sentry.getInstance();
 
         sentry.context = context.getApplicationContext();
+        sentry.disableOnDebug = disableOnDebug && BuildConfig.DEBUG;
 
         Uri uri = Uri.parse(dsn);
         String port = "";
@@ -419,7 +425,9 @@ public class Sentry {
             return;
         }
 
-        sentry.executor.execute(sentry.makePoster(request));
+        if (!sentry.disableOnDebug) {
+            sentry.executor.execute(sentry.makePoster(request));
+        }
     }
 
     private static class SentryUncaughtExceptionHandler implements UncaughtExceptionHandler {
